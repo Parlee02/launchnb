@@ -7,7 +7,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, {
+  Callout,
+  Circle,
+  Marker,
+} from 'react-native-maps';
 import { supabase } from '../../supabaseClient';
 
 type Launch = {
@@ -17,14 +21,28 @@ type Launch = {
   Longitude: number;
 };
 
+type DeconStation = {
+  station_id: string;
+  station_type: string;
+  location_name: string;
+  latitude: number;
+  longitude: number;
+  operational_status: string;
+};
+
+// 🔧 EASY TO TUNE
+const DECON_RADIUS_METERS = 5000;
+
 export default function MapScreen() {
   const [launches, setLaunches] = useState<Launch[]>([]);
+  const [deconStations, setDeconStations] = useState<DeconStation[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLaunches();
+    fetchDeconStations();
   }, []);
 
   const fetchLaunches = async () => {
@@ -45,6 +63,19 @@ export default function MapScreen() {
     setLoading(false);
   };
 
+  const fetchDeconStations = async () => {
+    const { data, error } = await supabase
+      .from('decon_stations')
+      .select('*');
+
+    if (error) {
+      console.error('Error loading decon stations:', error.message);
+      return;
+    }
+
+    setDeconStations(data ?? []);
+  };
+
   const filteredLaunches = useMemo(() => {
     if (!search) return launches;
     return launches.filter(l =>
@@ -52,7 +83,7 @@ export default function MapScreen() {
     );
   }, [launches, search]);
 
-  // Web fallback (react-native-maps does not render on web)
+  // 🌐 Web fallback
   if (Platform.OS === 'web') {
     return (
       <View style={styles.webContainer}>
@@ -68,8 +99,6 @@ export default function MapScreen() {
           style={styles.search}
         />
 
-        {loading && <ActivityIndicator size="large" />}
-
         {filteredLaunches.map(launch => (
           <Text key={launch.id} style={styles.listItem}>
             {launch.Name}
@@ -79,7 +108,6 @@ export default function MapScreen() {
     );
   }
 
-  // Native iOS map
   if (loading) {
     return (
       <View style={styles.center}>
@@ -117,6 +145,7 @@ export default function MapScreen() {
           longitudeDelta: 3,
         }}
       >
+        {/* 🚤 Boat launches (markers, auto-decluttered) */}
         {filteredLaunches.map(launch => (
           <Marker
             key={launch.id}
@@ -127,18 +156,50 @@ export default function MapScreen() {
             title={launch.Name}
           />
         ))}
+
+        {/* 🧼 Decon stations = POLYGON + POINT */}
+        {deconStations.map(station => (
+          <View key={station.station_id}>
+            {/* POLYGON / SERVICE AREA (always visible) */}
+            <Circle
+              center={{
+                latitude: station.latitude,
+                longitude: station.longitude,
+              }}
+              radius={DECON_RADIUS_METERS}
+              strokeColor="rgba(0, 122, 255, 0.9)"
+              fillColor="rgba(0, 122, 255, 0.25)"
+              strokeWidth={2}
+            />
+
+            {/* POINT / EXACT LOCATION */}
+            <Marker
+              coordinate={{
+                latitude: station.latitude,
+                longitude: station.longitude,
+              }}
+              pinColor="blue"
+            >
+              <Callout>
+                <View style={{ width: 220 }}>
+                  <Text style={{ fontWeight: '600' }}>
+                    {station.location_name}
+                  </Text>
+                  <Text>Type: {station.station_type}</Text>
+                  <Text>Status: {station.operational_status}</Text>
+                </View>
+              </Callout>
+            </Marker>
+          </View>
+        ))}
       </MapView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  map: { flex: 1 },
   search: {
     margin: 12,
     backgroundColor: '#fff',
@@ -157,26 +218,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  muted: {
-    color: '#666',
-  },
-  error: {
-    color: '#c00',
-    fontWeight: '600',
-  },
-  webContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: '#666',
-    marginBottom: 12,
-  },
+  muted: { color: '#666' },
+  error: { color: '#c00', fontWeight: '600' },
+  webContainer: { flex: 1, padding: 16 },
+  title: { fontSize: 22, fontWeight: '600' },
+  subtitle: { color: '#666', marginBottom: 12 },
   listItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,
