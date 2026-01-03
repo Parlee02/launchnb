@@ -1,3 +1,4 @@
+import { supabase } from '@/supabaseClient';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,12 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, {
-  Callout,
-  Circle,
-  Marker,
-} from 'react-native-maps';
-import { supabase } from '../../supabaseClient';
+import MapView, { Marker } from 'react-native-maps';
 
 type Launch = {
   id: string;
@@ -21,28 +17,14 @@ type Launch = {
   Longitude: number;
 };
 
-type DeconStation = {
-  station_id: string;
-  station_type: string;
-  location_name: string;
-  latitude: number;
-  longitude: number;
-  operational_status: string;
-};
-
-// 🔧 EASY TO TUNE
-const DECON_RADIUS_METERS = 5000;
-
 export default function MapScreen() {
   const [launches, setLaunches] = useState<Launch[]>([]);
-  const [deconStations, setDeconStations] = useState<DeconStation[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLaunches();
-    fetchDeconStations();
   }, []);
 
   const fetchLaunches = async () => {
@@ -61,19 +43,6 @@ export default function MapScreen() {
 
     setLaunches(data ?? []);
     setLoading(false);
-  };
-
-  const fetchDeconStations = async () => {
-    const { data, error } = await supabase
-      .from('decon_stations')
-      .select('*');
-
-    if (error) {
-      console.error('Error loading decon stations:', error.message);
-      return;
-    }
-
-    setDeconStations(data ?? []);
   };
 
   const filteredLaunches = useMemo(() => {
@@ -145,7 +114,6 @@ export default function MapScreen() {
           longitudeDelta: 3,
         }}
       >
-        {/* 🚤 Boat launches (markers, auto-decluttered) */}
         {filteredLaunches.map(launch => (
           <Marker
             key={launch.id}
@@ -155,42 +123,6 @@ export default function MapScreen() {
             }}
             title={launch.Name}
           />
-        ))}
-
-        {/* 🧼 Decon stations = POLYGON + POINT */}
-        {deconStations.map(station => (
-          <View key={station.station_id}>
-            {/* POLYGON / SERVICE AREA (always visible) */}
-            <Circle
-              center={{
-                latitude: station.latitude,
-                longitude: station.longitude,
-              }}
-              radius={DECON_RADIUS_METERS}
-              strokeColor="rgba(0, 122, 255, 0.9)"
-              fillColor="rgba(0, 122, 255, 0.25)"
-              strokeWidth={2}
-            />
-
-            {/* POINT / EXACT LOCATION */}
-            <Marker
-              coordinate={{
-                latitude: station.latitude,
-                longitude: station.longitude,
-              }}
-              pinColor="blue"
-            >
-              <Callout>
-                <View style={{ width: 220 }}>
-                  <Text style={{ fontWeight: '600' }}>
-                    {station.location_name}
-                  </Text>
-                  <Text>Type: {station.station_type}</Text>
-                  <Text>Status: {station.operational_status}</Text>
-                </View>
-              </Callout>
-            </Marker>
-          </View>
         ))}
       </MapView>
     </View>

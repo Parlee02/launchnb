@@ -1,14 +1,14 @@
+import { supabase } from '@/supabaseClient';
 import { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import { supabase } from '../../supabaseClient';
 
 type Launch = {
   id: string;
@@ -111,26 +111,6 @@ export default function FlowMapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* MODE TOGGLE */}
-      <View style={styles.toggleRow}>
-        <ToggleButton
-          label="Incoming"
-          active={mode === 'incoming'}
-          onPress={() => {
-            setMode('incoming');
-            setSelectedFlow(null);
-          }}
-        />
-        <ToggleButton
-          label="Outgoing"
-          active={mode === 'outgoing'}
-          onPress={() => {
-            setMode('outgoing');
-            setSelectedFlow(null);
-          }}
-        />
-      </View>
-
       <MapView
         style={styles.map}
         initialRegion={{
@@ -140,12 +120,11 @@ export default function FlowMapScreen() {
           longitudeDelta: 4,
         }}
         onPress={() => {
-          // ✅ only fires for empty map presses
           setSelectedLaunch(null);
           setSelectedFlow(null);
         }}
       >
-        {/* ALL LAUNCH MARKERS */}
+        {/* ALL LAUNCHES */}
         {!selectedLaunch &&
           launches.map(l => (
             <Marker
@@ -157,7 +136,7 @@ export default function FlowMapScreen() {
               pinColor="red"
               title={l.Name}
               onPress={(e) => {
-                e.stopPropagation(); // 🔑 THIS FIXES IT
+                e.stopPropagation();
                 setSelectedLaunch(l);
                 setSelectedFlow(null);
               }}
@@ -173,9 +152,7 @@ export default function FlowMapScreen() {
             }}
             pinColor="red"
             title={selectedLaunch.Name}
-            onPress={(e) => {
-              e.stopPropagation();
-            }}
+            onPress={(e) => e.stopPropagation()}
           />
         )}
 
@@ -218,7 +195,6 @@ export default function FlowMapScreen() {
 
                 <Marker
                   coordinate={endPoint}
-                  anchor={{ x: 0.5, y: 0.5 }}
                   onPress={(e) => {
                     e.stopPropagation();
                     setSelectedFlow(f);
@@ -233,25 +209,37 @@ export default function FlowMapScreen() {
           })}
       </MapView>
 
-      {/* INFO OVERLAY */}
+      {/* TOGGLE */}
+      <View style={styles.toggleOverlay}>
+        <ToggleButton
+          label="Incoming"
+          active={mode === 'incoming'}
+          onPress={() => {
+            setMode('incoming');
+            setSelectedFlow(null);
+          }}
+        />
+        <ToggleButton
+          label="Outgoing"
+          active={mode === 'outgoing'}
+          onPress={() => {
+            setMode('outgoing');
+            setSelectedFlow(null);
+          }}
+        />
+      </View>
+
+      {/* INFO PANEL (THIS IS THE KEY FIX) */}
       {selectedFlow && selectedLaunch && (
         <View style={styles.infoOverlay}>
-          <Text style={styles.infoText}>
+          <Text style={styles.infoTitle}>
             {mode === 'incoming'
               ? `Incoming from ${selectedFlow.name}`
               : `Outgoing to ${selectedFlow.name}`}
           </Text>
-          <Text style={styles.infoSubtext}>
+          <Text style={styles.infoSub}>
             {selectedFlow.count} boat
             {selectedFlow.count > 1 ? 's' : ''}
-          </Text>
-        </View>
-      )}
-
-      {!selectedLaunch && (
-        <View style={styles.overlay}>
-          <Text style={styles.overlayText}>
-            Tap a boat launch to view movements
           </Text>
         </View>
       )}
@@ -273,7 +261,9 @@ function ToggleButton({
       onPress={onPress}
       style={[styles.toggleButton, active && styles.toggleActive]}
     >
-      <Text style={styles.toggleText}>{label}</Text>
+      <Text style={[styles.toggleText, active && { color: '#fff' }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -288,19 +278,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  toggleRow: {
+  toggleOverlay: {
+    position: 'absolute',
+    top: 64,
+    alignSelf: 'center',
     flexDirection: 'row',
-    justifyContent: 'center',
-    padding: 8,
-    gap: 8,
     backgroundColor: '#fff',
-    zIndex: 10,
+    borderRadius: 22,
+    padding: 4,
+    gap: 6,
+    elevation: 6,
+    zIndex: 20,
   },
 
   toggleButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: '#eee',
   },
 
@@ -312,40 +306,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  overlay: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 10,
-    borderRadius: 8,
-  },
-
-  overlayText: {
-    color: '#fff',
-    fontSize: 14,
-  },
-
   infoOverlay: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 24,
     alignSelf: 'center',
     backgroundColor: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    elevation: 8,
   },
 
-  infoText: {
+  infoTitle: {
     fontWeight: '600',
     fontSize: 14,
   },
 
-  infoSubtext: {
+  infoSub: {
     fontSize: 12,
     color: '#555',
     marginTop: 2,
