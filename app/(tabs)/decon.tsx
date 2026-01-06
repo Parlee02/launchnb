@@ -1,12 +1,14 @@
 import { supabase } from '@/supabaseClient';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Linking,
-    Platform,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import MapView, { Callout, Circle, Marker } from 'react-native-maps';
 
@@ -24,6 +26,9 @@ const DECON_RADIUS_METERS = 5000;
 export default function DeconMapScreen() {
   const [stations, setStations] = useState<DeconStation[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* 🗺️ MAP TYPE */
+  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
 
   useEffect(() => {
     fetchStations();
@@ -44,8 +49,8 @@ export default function DeconMapScreen() {
     setLoading(false);
   };
 
-  // 🚗 OPEN DIRECTIONS (APPLE MAPS / GOOGLE MAPS)
-  const openDirections = (lat: number, lon: number, label: string) => {
+  // 🚗 OPEN DIRECTIONS (APPLE / GOOGLE MAPS)
+  const openDirections = (lat: number, lon: number) => {
     const url =
       Platform.OS === 'ios'
         ? `http://maps.apple.com/?daddr=${lat},${lon}`
@@ -76,6 +81,7 @@ export default function DeconMapScreen() {
     <View style={styles.container}>
       <MapView
         style={styles.map}
+        mapType={mapType}
         initialRegion={{
           latitude: 46.0,
           longitude: -66.8,
@@ -107,13 +113,11 @@ export default function DeconMapScreen() {
               pinColor="blue"
               zIndex={10}
             >
-              {/* ✅ TAP ANYWHERE ON CALLOUT TO OPEN DIRECTIONS */}
               <Callout
                 onPress={() =>
                   openDirections(
                     station.latitude,
-                    station.longitude,
-                    station.location_name
+                    station.longitude
                   )
                 }
               >
@@ -139,17 +143,63 @@ export default function DeconMapScreen() {
           </View>
         ))}
       </MapView>
+
+      {/* 🛰️ MAP TYPE TOGGLE */}
+      <View style={styles.mapToggle}>
+        <Pressable
+          onPress={() =>
+            setMapType(prev =>
+              prev === 'standard' ? 'satellite' : 'standard'
+            )
+          }
+          style={styles.mapToggleButton}
+        >
+          <Image
+            source={
+              mapType === 'standard'
+                ? require('@/assets/imagesat.png')
+                : require('@/assets/imagedef.png')
+            }
+            style={styles.mapToggleImage}
+          />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
+/* ---------------- STYLES ---------------- */
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+  },
+
+  /* 🛰️ Map toggle */
+  mapToggle: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    zIndex: 30,
+  },
+  mapToggleButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  mapToggleImage: {
+    width: '100%',
+    height: '100%',
   },
 });

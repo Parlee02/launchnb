@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -23,6 +24,9 @@ export default function MapScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 🗺️ map type toggle
+  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+
   useEffect(() => {
     fetchLaunches();
   }, []);
@@ -31,9 +35,7 @@ export default function MapScreen() {
     setLoading(true);
     setError(null);
 
-    const { data, error } = await supabase
-      .from('launches')
-      .select('*');
+    const { data, error } = await supabase.from('launches').select('*');
 
     if (error) {
       setError(error.message);
@@ -58,7 +60,7 @@ export default function MapScreen() {
       <View style={styles.webContainer}>
         <Text style={styles.title}>Launch Map</Text>
         <Text style={styles.subtitle}>
-          Map is available on iOS. Showing list instead.
+          Map is available on mobile. Showing list instead.
         </Text>
 
         <TextInput
@@ -68,9 +70,9 @@ export default function MapScreen() {
           style={styles.search}
         />
 
-        {filteredLaunches.map(launch => (
-          <Text key={launch.id} style={styles.listItem}>
-            {launch.Name}
+        {filteredLaunches.map(l => (
+          <Text key={l.id} style={styles.listItem}>
+            {l.Name}
           </Text>
         ))}
       </View>
@@ -97,6 +99,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 🔍 Search */}
       <TextInput
         placeholder="Search launches"
         placeholderTextColor="#888"
@@ -105,10 +108,12 @@ export default function MapScreen() {
         style={styles.search}
       />
 
+      {/* 🗺️ Map */}
       <MapView
         style={styles.map}
+        mapType={mapType}
         initialRegion={{
-          latitude: 46.0,
+          latitude: 46,
           longitude: -66.8,
           latitudeDelta: 3,
           longitudeDelta: 3,
@@ -125,6 +130,22 @@ export default function MapScreen() {
           />
         ))}
       </MapView>
+
+      {/* 🛰️ Toggle */}
+      <View style={styles.mapToggle}>
+        <Pressable
+          onPress={() =>
+            setMapType(prev =>
+              prev === 'standard' ? 'satellite' : 'standard'
+            )
+          }
+          style={styles.mapToggleButton}
+        >
+          <Text style={styles.mapToggleText}>
+            {mapType === 'standard' ? '🛰️' : '🗺️'}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -132,6 +153,7 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+
   search: {
     margin: 12,
     backgroundColor: '#fff',
@@ -139,22 +161,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     elevation: 5,
+    zIndex: 10,
   },
+
+  mapToggle: {
+    position: 'absolute',
+    top: 120,
+    right: 16,
+    zIndex: 20,
+  },
+
+  mapToggleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+  },
+
+  mapToggleText: {
+    fontSize: 20,
+  },
+
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
+
   muted: { color: '#666' },
   error: { color: '#c00', fontWeight: '600' },
+
   webContainer: { flex: 1, padding: 16 },
   title: { fontSize: 22, fontWeight: '600' },
   subtitle: { color: '#666', marginBottom: 12 },
+
   listItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,

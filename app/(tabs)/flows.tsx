@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,6 +11,13 @@ import {
   View,
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+
+/* ---------------- COLORS ---------------- */
+
+const INCOMING_COLOR = 'rgba(88,86,214,0.85)'; // 🟣 muted purple
+const OUTGOING_COLOR = 'rgba(0,122,255,0.85)'; // 🔵 blue
+
+/* ---------------- TYPES ---------------- */
 
 type Launch = {
   id: string;
@@ -35,6 +43,8 @@ type Flow = {
 
 type Mode = 'incoming' | 'outgoing';
 
+/* ---------------- SCREEN ---------------- */
+
 export default function FlowMapScreen() {
   const [launches, setLaunches] = useState<Launch[]>([]);
   const [rows, setRows] = useState<MovementRow[]>([]);
@@ -42,6 +52,9 @@ export default function FlowMapScreen() {
   const [mode, setMode] = useState<Mode>('incoming');
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
   const [loading, setLoading] = useState(true);
+
+  /* 🗺️ MAP TYPE */
+  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
 
   const loadData = async () => {
     setLoading(true);
@@ -62,7 +75,7 @@ export default function FlowMapScreen() {
     setLoading(false);
   };
 
-  // ✅ OPTION A: refresh when screen gains focus
+  // ✅ refresh when screen gains focus
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -72,11 +85,12 @@ export default function FlowMapScreen() {
   const filteredRows = useMemo(() => {
     if (!selectedLaunch) return [];
 
-    return rows.filter(r =>
-      r.boat_launch === selectedLaunch.Name &&
-      (mode === 'incoming'
-        ? r.movement_type === 'previous'
-        : r.movement_type === 'next')
+    return rows.filter(
+      r =>
+        r.boat_launch === selectedLaunch.Name &&
+        (mode === 'incoming'
+          ? r.movement_type === 'previous'
+          : r.movement_type === 'next')
     );
   }, [rows, selectedLaunch, mode]);
 
@@ -116,10 +130,14 @@ export default function FlowMapScreen() {
     );
   }
 
+  const activeColor =
+    mode === 'incoming' ? INCOMING_COLOR : OUTGOING_COLOR;
+
   return (
     <View style={styles.container}>
       <MapView
         style={styles.map}
+        mapType={mapType}
         initialRegion={{
           latitude: 46,
           longitude: -66.8,
@@ -142,7 +160,7 @@ export default function FlowMapScreen() {
               }}
               pinColor="red"
               title={l.Name}
-              onPress={(e) => {
+              onPress={e => {
                 e.stopPropagation();
                 setSelectedLaunch(l);
                 setSelectedFlow(null);
@@ -159,7 +177,7 @@ export default function FlowMapScreen() {
             }}
             pinColor="red"
             title={selectedLaunch.Name}
-            onPress={(e) => e.stopPropagation()}
+            onPress={e => e.stopPropagation()}
           />
         )}
 
@@ -191,10 +209,10 @@ export default function FlowMapScreen() {
                           endPoint,
                         ]
                   }
-                  strokeColor="rgba(0,122,255,0.8)"
+                  strokeColor={activeColor}
                   strokeWidth={3}
                   tappable
-                  onPress={(e) => {
+                  onPress={e => {
                     e.stopPropagation();
                     setSelectedFlow(f);
                   }}
@@ -202,13 +220,25 @@ export default function FlowMapScreen() {
 
                 <Marker
                   coordinate={endPoint}
-                  onPress={(e) => {
+                  onPress={e => {
                     e.stopPropagation();
                     setSelectedFlow(f);
                   }}
                 >
-                  <View style={styles.countBubble}>
-                    <Text style={styles.countText}>{f.count}</Text>
+                  <View
+                    style={[
+                      styles.countBubble,
+                      { borderColor: activeColor },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.countText,
+                        { color: activeColor },
+                      ]}
+                    >
+                      {f.count}
+                    </Text>
                   </View>
                 </Marker>
               </View>
@@ -216,7 +246,28 @@ export default function FlowMapScreen() {
           })}
       </MapView>
 
-      {/* TOGGLE */}
+      {/* 🛰️ MAP TYPE TOGGLE */}
+      <View style={styles.mapToggle}>
+        <Pressable
+          onPress={() =>
+            setMapType(prev =>
+              prev === 'standard' ? 'satellite' : 'standard'
+            )
+          }
+          style={styles.mapToggleButton}
+        >
+          <Image
+            source={
+              mapType === 'standard'
+                ? require('@/assets/imagesat.png')
+                : require('@/assets/imagedef.png')
+            }
+            style={styles.mapToggleImage}
+          />
+        </Pressable>
+      </View>
+
+      {/* MODE TOGGLE */}
       <View style={styles.toggleOverlay}>
         <ToggleButton
           label="Incoming"
@@ -254,6 +305,8 @@ export default function FlowMapScreen() {
   );
 }
 
+/* ---------------- TOGGLE BUTTON ---------------- */
+
 function ToggleButton({
   label,
   active,
@@ -275,6 +328,8 @@ function ToggleButton({
   );
 }
 
+/* ---------------- STYLES ---------------- */
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
@@ -283,6 +338,28 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* 🛰️ Map toggle */
+  mapToggle: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    zIndex: 30,
+  },
+  mapToggleButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  mapToggleImage: {
+    width: '100%',
+    height: '100%',
   },
 
   toggleOverlay: {
@@ -341,7 +418,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: '#007aff',
     minWidth: 22,
     alignItems: 'center',
   },
@@ -349,6 +425,5 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#007aff',
   },
 });

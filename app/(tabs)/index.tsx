@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -41,13 +42,16 @@ export default function LaunchesScreen() {
   const [selectedLaunch, setSelectedLaunch] = useState<Launch | null>(null);
   const [view, setView] = useState<SheetView>('prompt');
 
-  // Previous trip
+  /* 🗺️ MAP TYPE */
+  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+
+  /* Previous trip */
   const [prevProvince, setPrevProvince] = useState('New Brunswick');
   const [prevQuery, setPrevQuery] = useState('');
   const [prevResults, setPrevResults] = useState<any[]>([]);
   const [prevWaterbody, setPrevWaterbody] = useState<string | null>(null);
 
-  // Next trip
+  /* Next trip */
   const [nextProvince, setNextProvince] = useState('New Brunswick');
   const [nextQuery, setNextQuery] = useState('');
   const [nextResults, setNextResults] = useState<any[]>([]);
@@ -64,7 +68,7 @@ export default function LaunchesScreen() {
     load();
   }, []);
 
-  // Search previous
+  /* Search previous */
   useEffect(() => {
     if (!prevQuery || prevWaterbody) return;
     const t = setTimeout(async () => {
@@ -73,7 +77,7 @@ export default function LaunchesScreen() {
     return () => clearTimeout(t);
   }, [prevQuery, prevProvince, prevWaterbody]);
 
-  // Search next
+  /* Search next */
   useEffect(() => {
     if (!nextQuery || nextWaterbody) return;
     const t = setTimeout(async () => {
@@ -111,8 +115,10 @@ export default function LaunchesScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* 🗺️ MAP */}
       <MapView
         style={styles.map}
+        mapType={mapType}
         initialRegion={{
           latitude: 46,
           longitude: -66.8,
@@ -133,6 +139,27 @@ export default function LaunchesScreen() {
         ))}
       </MapView>
 
+      {/* 🛰️ MAP TYPE TOGGLE */}
+      <View style={styles.mapToggle}>
+        <Pressable
+          onPress={() =>
+            setMapType(prev =>
+              prev === 'standard' ? 'satellite' : 'standard'
+            )
+          }
+          style={styles.mapToggleButton}
+        >
+          <Image
+            source={
+              mapType === 'standard'
+                ? require('@/assets/imagesat.png')
+                : require('@/assets/imagedef.png')
+            }
+            style={styles.mapToggleImage}
+          />
+        </Pressable>
+      </View>
+
       {/* MODAL */}
       <Modal visible={!!selectedLaunch} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
@@ -148,7 +175,9 @@ export default function LaunchesScreen() {
                     style={styles.primaryButton}
                     onPress={() => setView('checkin')}
                   >
-                    <Text style={styles.primaryText}>Check in at this launch</Text>
+                    <Text style={styles.primaryText}>
+                      Check in at this launch
+                    </Text>
                   </Pressable>
 
                   <Pressable style={styles.cancel} onPress={closeAll}>
@@ -242,7 +271,7 @@ export default function LaunchesScreen() {
                         <Pressable
                           style={styles.undecidedButton}
                           onPress={() =>
-                            setNextWaterbody('Haven’t decided yet')
+                            setNextWaterbody("Haven’t decided yet")
                           }
                         >
                           <Text style={styles.undecidedText}>
@@ -276,7 +305,6 @@ export default function LaunchesScreen() {
                     )}
                   </View>
 
-                  {/* ✅ THIS IS THE IMPORTANT PART */}
                   <Pressable
                     disabled={!canSubmit}
                     style={[
@@ -284,27 +312,14 @@ export default function LaunchesScreen() {
                       !canSubmit && styles.disabledButton,
                     ]}
                     onPress={async () => {
-                      const payload = {
+                      await supabase.from('launch_checkins').insert({
                         launch_id: selectedLaunch?.id,
                         launch_name: selectedLaunch?.Name,
                         prev_province: prevProvince,
                         prev_waterbody: prevWaterbody,
                         next_province: nextProvince,
                         next_waterbody: nextWaterbody,
-                      };
-
-                      console.log('CHECK-IN PAYLOAD:', payload);
-
-                      const { error } = await supabase
-                        .from('launch_checkins')
-                        .insert(payload);
-
-                      if (error) {
-                        console.error('CHECK-IN INSERT ERROR:', error);
-                        return;
-                      }
-
-                      console.log('CHECK-IN INSERT SUCCESS');
+                      });
                       closeAll();
                     }}
                   >
@@ -336,7 +351,10 @@ export default function LaunchesScreen() {
                     </Pressable>
                   ))}
 
-                  <Pressable style={styles.cancel} onPress={() => setView('checkin')}>
+                  <Pressable
+                    style={styles.cancel}
+                    onPress={() => setView('checkin')}
+                  >
                     <Text>Cancel</Text>
                   </Pressable>
                 </>
@@ -352,6 +370,27 @@ export default function LaunchesScreen() {
 const styles = StyleSheet.create({
   map: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  mapToggle: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    zIndex: 20,
+  },
+  mapToggleButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  mapToggleImage: {
+    width: '100%',
+    height: '100%',
+  },
 
   modalBackdrop: {
     flex: 1,

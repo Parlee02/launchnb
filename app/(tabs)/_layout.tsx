@@ -1,10 +1,27 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+
+/* ---------- HEADER TITLE ---------- */
+
+function HeaderTitle() {
+  return (
+    <View style={styles.header}>
+      <Text style={styles.title}>LaunchNB</Text>
+      <Image
+        source={require('@/assets/nb-pin.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+    </View>
+  );
+}
+
+/* ---------- TABS ---------- */
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -13,7 +30,13 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: useClientOnlyValue(false, true),
+
+        // show header
+        headerShown: true,
+
+        // custom header
+        headerTitle: () => <HeaderTitle />,
+        headerTitleAlign: 'center',
       }}
     >
       {/* 🚤 Launches */}
@@ -51,3 +74,26 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+/* ---------- STYLES ---------- */
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+    marginRight: -4, // 👈 controls distance to pin
+  },
+
+  logo: {
+    width: 30,   // slightly smaller = tighter
+    height: 30,
+    marginTop: 4, // optical alignment tweak
+  },
+});
+
