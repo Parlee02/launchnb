@@ -2,6 +2,7 @@ import { supabase } from '@/supabaseClient';
 
 /**
  * Province-scoped, accent-insensitive waterbody search
+ * Uses public.waterbodies (NEW correct table)
  */
 export async function searchWaterbodies(
   query: string,
@@ -19,10 +20,11 @@ export async function searchWaterbodies(
     .replace(/[\u0300-\u036f]/g, '');
 
   const { data, error } = await supabase
-    .from('waterbody_search')
+    .from('waterbodies') // ✅ FIXED: new table
     .select('search_name')
-    .eq('region', province)              // 🔒 PROVINCE FILTER
+    .eq('region', province) // ✅ Province filter
     .ilike('search_name_norm', `%${normalizedQuery}%`)
+    .order('search_name')
     .limit(limit);
 
   if (error) {

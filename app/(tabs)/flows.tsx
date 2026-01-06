@@ -1,5 +1,6 @@
 import { supabase } from '@/supabaseClient';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -42,25 +43,31 @@ export default function FlowMapScreen() {
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
     setLoading(true);
 
-    const { data: launchData } = await supabase
+    const { data: launchData, error: launchError } = await supabase
       .from('launches')
       .select('*');
 
-    const { data: movementData } = await supabase
+    const { data: movementData, error: movementError } = await supabase
       .from('boater_movements')
       .select('*');
+
+    if (launchError) console.error(launchError);
+    if (movementError) console.error(movementError);
 
     setLaunches(launchData ?? []);
     setRows(movementData ?? []);
     setLoading(false);
   };
+
+  // ✅ OPTION A: refresh when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const filteredRows = useMemo(() => {
     if (!selectedLaunch) return [];
@@ -229,7 +236,7 @@ export default function FlowMapScreen() {
         />
       </View>
 
-      {/* INFO PANEL (THIS IS THE KEY FIX) */}
+      {/* INFO PANEL */}
       {selectedFlow && selectedLaunch && (
         <View style={styles.infoOverlay}>
           <Text style={styles.infoTitle}>
