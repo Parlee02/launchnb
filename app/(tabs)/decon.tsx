@@ -49,7 +49,7 @@ export default function DeconMapScreen() {
     setLoading(false);
   };
 
-  // 🚗 OPEN DIRECTIONS (APPLE / GOOGLE MAPS)
+  // 🚗 OPEN DIRECTIONS
   const openDirections = (lat: number, lon: number) => {
     const url =
       Platform.OS === 'ios'
@@ -59,7 +59,6 @@ export default function DeconMapScreen() {
     Linking.openURL(url);
   };
 
-  // 🌐 Web fallback
   if (Platform.OS === 'web') {
     return (
       <View style={styles.center}>
@@ -98,21 +97,31 @@ export default function DeconMapScreen() {
                 longitude: station.longitude,
               }}
               radius={DECON_RADIUS_METERS}
-              strokeColor="rgba(0,122,255,0.9)"
-              fillColor="rgba(0,122,255,0.25)"
+              strokeColor="rgba(0,122,255,0.6)"
+              fillColor="rgba(0,122,255,0.18)"
               strokeWidth={2}
               zIndex={1}
             />
 
-            {/* 🔵 PIN */}
+            {/* 📍 CUSTOM PIN */}
             <Marker
               coordinate={{
                 latitude: station.latitude,
                 longitude: station.longitude,
               }}
-              pinColor="blue"
+              anchor={{ x: 0.5, y: 1 }}
               zIndex={10}
             >
+              <View style={styles.pin}>
+                <View style={styles.pinInner}>
+                  <Image
+                    source={require('@/assets/decon.png')}
+                    style={styles.pinImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              </View>
+
               <Callout
                 onPress={() =>
                   openDirections(
@@ -143,6 +152,13 @@ export default function DeconMapScreen() {
           </View>
         ))}
       </MapView>
+
+      {/* ℹ️ FLOATING HINT */}
+      <View style={styles.floatingHint}>
+        <Text style={styles.hintText}>
+          Tap a station for directions and decontamination info
+        </Text>
+      </View>
 
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
@@ -181,6 +197,59 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
+  /* 📍 Pin styles */
+  pin: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#007AFF',
+    borderRadius: 22,
+    transform: [{ rotate: '45deg' }],
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 2,
+    borderColor: '#fff',
+
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+
+  pinInner: {
+    width: 26,
+    height: 26,
+    backgroundColor: '#fff',
+    borderRadius: 13,
+    transform: [{ rotate: '-45deg' }],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  pinImage: {
+    width: 18,
+    height: 18,
+  },
+
+  /* ℹ️ Floating hint */
+  floatingHint: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    elevation: 4,
+  },
+
+  hintText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+
   /* 🛰️ Map toggle */
   mapToggle: {
     position: 'absolute',
@@ -188,6 +257,7 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 30,
   },
+
   mapToggleButton: {
     width: 64,
     height: 64,
@@ -198,6 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
+
   mapToggleImage: {
     width: '100%',
     height: '100%',

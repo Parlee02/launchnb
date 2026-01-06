@@ -14,8 +14,8 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 
 /* ---------------- COLORS ---------------- */
 
-const INCOMING_COLOR = 'rgba(88,86,214,0.85)'; // 🟣 muted purple
-const OUTGOING_COLOR = 'rgba(0,122,255,0.85)'; // 🔵 blue
+const INCOMING_COLOR = 'rgba(88,86,214,0.85)';
+const OUTGOING_COLOR = 'rgba(0,122,255,0.85)';
 
 /* ---------------- TYPES ---------------- */
 
@@ -51,46 +51,57 @@ export default function FlowMapScreen() {
   const [selectedLaunch, setSelectedLaunch] = useState<Launch | null>(null);
   const [mode, setMode] = useState<Mode>('incoming');
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [loadingLaunches, setLoadingLaunches] = useState(true);
+  const [loadingFlows, setLoadingFlows] = useState(false);
 
   /* 🗺️ MAP TYPE */
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
 
-  const loadData = async () => {
-    setLoading(true);
+  /* ---------------- DATA LOADING ---------------- */
 
-    const { data: launchData, error: launchError } = await supabase
+  const loadLaunches = async () => {
+    setLoadingLaunches(true);
+
+    const { data, error } = await supabase
       .from('launches')
       .select('*');
 
-    const { data: movementData, error: movementError } = await supabase
-      .from('boater_movements')
-      .select('*');
+    if (error) console.error(error);
 
-    if (launchError) console.error(launchError);
-    if (movementError) console.error(movementError);
-
-    setLaunches(launchData ?? []);
-    setRows(movementData ?? []);
-    setLoading(false);
+    setLaunches(data ?? []);
+    setLoadingLaunches(false);
   };
 
-  // ✅ refresh when screen gains focus
+  const loadFlowsForLaunch = async (launchName: string) => {
+    setLoadingFlows(true);
+
+    const { data, error } = await supabase
+      .from('boater_movements')
+      .select('*')
+      .eq('boat_launch', launchName);
+
+    if (error) console.error(error);
+
+    setRows(data ?? []);
+    setLoadingFlows(false);
+  };
+
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadLaunches();
     }, [])
   );
+
+  /* ---------------- FLOW PROCESSING ---------------- */
 
   const filteredRows = useMemo(() => {
     if (!selectedLaunch) return [];
 
-    return rows.filter(
-      r =>
-        r.boat_launch === selectedLaunch.Name &&
-        (mode === 'incoming'
-          ? r.movement_type === 'previous'
-          : r.movement_type === 'next')
+    return rows.filter(r =>
+      mode === 'incoming'
+        ? r.movement_type === 'previous'
+        : r.movement_type === 'next'
     );
   }, [rows, selectedLaunch, mode]);
 
@@ -113,6 +124,8 @@ export default function FlowMapScreen() {
     return Array.from(map.values());
   }, [filteredRows]);
 
+  /* ---------------- GUARDS ---------------- */
+
   if (Platform.OS === 'web') {
     return (
       <View style={styles.center}>
@@ -121,17 +134,19 @@ export default function FlowMapScreen() {
     );
   }
 
-  if (loading) {
+  if (loadingLaunches) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text>Loading movement data…</Text>
+        <Text>Loading launches…</Text>
       </View>
     );
   }
 
   const activeColor =
     mode === 'incoming' ? INCOMING_COLOR : OUTGOING_COLOR;
+
+  /* ---------------- RENDER ---------------- */
 
   return (
     <View style={styles.container}>
@@ -147,6 +162,7 @@ export default function FlowMapScreen() {
         onPress={() => {
           setSelectedLaunch(null);
           setSelectedFlow(null);
+          setRows([]);
         }}
       >
         {/* ALL LAUNCHES */}
@@ -164,6 +180,7 @@ export default function FlowMapScreen() {
                 e.stopPropagation();
                 setSelectedLaunch(l);
                 setSelectedFlow(null);
+                loadFlowsForLaunch(l.Name);
               }}
             />
           ))}
@@ -245,6 +262,21 @@ export default function FlowMapScreen() {
             );
           })}
       </MapView>
+
+      {/* ℹ️ FLOATING HINT */}
+      <View style={styles.floatingHint}>
+        <Text style={styles.hintText}>
+          Tap a launch to view incoming or outgoing boat movements
+        </Text>
+      </View>
+
+      {/* ⏳ FLOW LOADING PILL */}
+      {loadingFlows && selectedLaunch && (
+        <View style={styles.loadingPill}>
+          <ActivityIndicator size="small" />
+          <Text style={styles.loadingText}>Loading movements…</Text>
+        </View>
+      )}
 
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
@@ -340,7 +372,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  /* 🛰️ Map toggle */
+  floatingHint: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    elevation: 4,
+  },
+  hintText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+
+  loadingPill: {
+    position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    elevation: 6,
+  },
+  loadingText: {
+    fontSize: 12,
+  },
+
   mapToggle: {
     position: 'absolute',
     bottom: 24,

@@ -139,6 +139,13 @@ export default function LaunchesScreen() {
         ))}
       </MapView>
 
+      {/* ℹ️ FLOATING HINT */}
+      <View style={styles.floatingHint}>
+        <Text style={styles.hintText}>
+          Tap a boat launch to register your visit
+        </Text>
+      </View>
+
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
         <Pressable
@@ -367,9 +374,32 @@ export default function LaunchesScreen() {
   );
 }
 
+/* ---------------- STYLES ---------------- */
+
 const styles = StyleSheet.create({
   map: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  /* ℹ️ Floating hint */
+  floatingHint: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
+  },
 
   mapToggle: {
     position: 'absolute',
