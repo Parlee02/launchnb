@@ -1,9 +1,10 @@
 import { supabase } from '@/supabaseClient';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -17,12 +18,16 @@ import {
 import MapView, { Marker } from 'react-native-maps';
 import { searchWaterbodies } from '../../lib/searchwaterbodies';
 
+/* ---------------- TYPES ---------------- */
+
 type Launch = {
   id: string;
   Name: string;
   Latitude: number;
   Longitude: number;
 };
+
+type SheetView = 'prompt' | 'checkin' | 'province-prev' | 'province-next';
 
 const PROVINCES = [
   'New Brunswick',
@@ -33,7 +38,63 @@ const PROVINCES = [
   'Maine',
 ];
 
-type SheetView = 'prompt' | 'checkin' | 'province-prev' | 'province-next';
+/* ---------------- HELPERS ---------------- */
+
+function toNumber(v: any): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') {
+    const n = parseFloat(v.trim());
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Normalizes ANY Supabase row into Launch shape.
+ * Handles:
+ * - Name vs name
+ * - Latitude/Longitude vs latitude/longitude
+ * - id vs ID vs launch_id-ish fallback
+ * - numbers or numeric strings
+ */
+function normalizeLaunchRow(row: any, index: number): Launch | null {
+  const name = (row?.Name ?? row?.name ?? row?.launch_name ?? '').toString().trim();
+
+  const lat =
+    toNumber(row?.Latitude) ??
+    toNumber(row?.latitude) ??
+    toNumber(row?.Lat) ??
+    toNumber(row?.lat);
+
+  const lng =
+    toNumber(row?.Longitude) ??
+    toNumber(row?.longitude) ??
+    toNumber(row?.Lng) ??
+    toNumber(row?.lng) ??
+    toNumber(row?.Long) ??
+    toNumber(row?.long);
+
+  // If coords aren’t valid, we cannot render a marker — drop it.
+  if (lat == null || lng == null) return null;
+
+  // Sanity bounds (prevents weird rows from breaking marker rendering)
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+  // Ensure stable, unique id even if table has null/duplicate ids
+  const rawId = row?.id ?? row?.ID ?? row?.launch_id ?? row?.uuid;
+  const id = (rawId != null && String(rawId).trim().length > 0)
+    ? String(rawId)
+    : `row-${index}-${name}-${lat}-${lng}`;
+
+  return {
+    id,
+    Name: name.length ? name : `Unnamed launch (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+    Latitude: lat,
+    Longitude: lng,
+  };
+}
+
+/* ---------------- SCREEN ---------------- */
 
 export default function LaunchesScreen() {
   const [launches, setLaunches] = useState<Launch[]>([]);
@@ -44,6 +105,12 @@ export default function LaunchesScreen() {
 
   /* 🗺️ MAP TYPE */
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+
+  /* 🔍 LAUNCH SEARCH */
+  const [launchSearch, setLaunchSearch] = useState('');
+  const [showLaunchDropdown, setShowLaunchDropdown] = useState(false);
+
+  const mapRef = useRef<MapView>(null);
 
   /* Previous trip */
   const [prevProvince, setPrevProvince] = useState('New Brunswick');
@@ -61,12 +128,48 @@ export default function LaunchesScreen() {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from('launches').select('*');
-      setLaunches(data ?? []);
+      setLoading(true);
+
+      const { data, error } = await supabase.from('launches').select('*');
+
+      if (error) {
+        console.log('launches load error', error);
+        setLaunches([]);
+        setLoading(false);
+        return;
+      }
+
+      const raw = Array.isArray(data) ? data : [];
+      const normalized: Launch[] = [];
+
+      for (let i = 0; i < raw.length; i++) {
+        const n = normalizeLaunchRow(raw[i], i);
+        if (n) normalized.push(n);
+      }
+
+      // Helpful debug (you can delete later)
+      console.log(
+        `launches loaded: raw=${raw.length} normalized=${normalized.length} dropped=${raw.length - normalized.length}`
+      );
+
+      setLaunches(normalized);
       setLoading(false);
     };
+
     load();
   }, []);
+
+  /* 🔍 Filter launches for markers + dropdown */
+  const filteredLaunches = useMemo(() => {
+    const q = launchSearch.trim().toLowerCase();
+    if (!q) return launches;
+    return launches.filter(l => (l.Name ?? '').toLowerCase().includes(q));
+  }, [launches, launchSearch]);
+
+  const topLaunchMatches = useMemo(() => {
+    if (!launchSearch.trim()) return [];
+    return filteredLaunches.slice(0, 8);
+  }, [filteredLaunches, launchSearch]);
 
   /* Search previous */
   useEffect(() => {
@@ -95,7 +198,28 @@ export default function LaunchesScreen() {
     setNextQuery('');
     setPrevResults([]);
     setNextResults([]);
+    setLaunchSearch('');
+    setShowLaunchDropdown(false);
   };
+
+ const selectLaunchFromSearch = (l: Launch) => {
+  Keyboard.dismiss();
+  setShowLaunchDropdown(false);
+
+  setLaunchSearch(''); // ✅ IMPORTANT
+  setSelectedLaunch(l);
+  setView('prompt');
+
+  mapRef.current?.animateToRegion(
+    {
+      latitude: l.Latitude,
+      longitude: l.Longitude,
+      latitudeDelta: 0.10,
+      longitudeDelta: 0.10,
+    },
+    350
+  );
+};
 
   if (Platform.OS === 'web') {
     return (
@@ -113,10 +237,71 @@ export default function LaunchesScreen() {
     );
   }
 
+  const markers = launches;
+
   return (
     <View style={{ flex: 1 }}>
+      {/* 🔍 LAUNCH SEARCH BAR (OVERLAY) */}
+      <View style={styles.launchSearchWrap}>
+        <View style={styles.launchSearchRow}>
+          <TextInput
+            placeholder="Search boat launches…"
+            value={launchSearch}
+            onChangeText={t => {
+              setLaunchSearch(t);
+              setShowLaunchDropdown(true);
+            }}
+            onFocus={() => setShowLaunchDropdown(true)}
+            style={styles.launchSearchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            placeholderTextColor="#7A7A7A"
+          />
+
+          {!!launchSearch.trim() && (
+            <Pressable
+             onPress={() => {
+  setShowLaunchDropdown(false);
+  Keyboard.dismiss();
+}}
+              style={styles.clearBtn}
+              hitSlop={10}
+            >
+              <Text style={styles.clearBtnText}>×</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Dropdown results */}
+        {showLaunchDropdown && topLaunchMatches.length > 0 && (
+          <View style={styles.launchDropdown}>
+            {topLaunchMatches.map(item => (
+              <Pressable
+                key={item.id}
+                style={styles.launchDropdownItem}
+                onPress={() => selectLaunchFromSearch(item)}
+              >
+                <Text style={styles.launchDropdownText}>{item.Name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {showLaunchDropdown &&
+          !!launchSearch.trim() &&
+          topLaunchMatches.length === 0 && (
+            <View style={styles.launchDropdown}>
+              <View style={styles.launchDropdownItem}>
+                <Text style={styles.launchDropdownMuted}>No matches</Text>
+              </View>
+            </View>
+          )}
+      </View>
+
       {/* 🗺️ MAP */}
       <MapView
+        ref={mapRef}
         style={styles.map}
         mapType={mapType}
         initialRegion={{
@@ -125,8 +310,12 @@ export default function LaunchesScreen() {
           latitudeDelta: 3,
           longitudeDelta: 3,
         }}
+        onPress={() => {
+          setShowLaunchDropdown(false);
+          Keyboard.dismiss();
+        }}
       >
-        {launches.map(l => (
+        {markers.map(l => (
           <Marker
             key={l.id}
             coordinate={{ latitude: l.Latitude, longitude: l.Longitude }}
@@ -141,18 +330,14 @@ export default function LaunchesScreen() {
 
       {/* ℹ️ FLOATING HINT */}
       <View style={styles.floatingHint}>
-        <Text style={styles.hintText}>
-          Tap a boat launch to register your visit
-        </Text>
+        <Text style={styles.hintText}>Tap a boat launch to register your visit</Text>
       </View>
 
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
         <Pressable
           onPress={() =>
-            setMapType(prev =>
-              prev === 'standard' ? 'satellite' : 'standard'
-            )
+            setMapType(prev => (prev === 'standard' ? 'satellite' : 'standard'))
           }
           style={styles.mapToggleButton}
         >
@@ -182,9 +367,7 @@ export default function LaunchesScreen() {
                     style={styles.primaryButton}
                     onPress={() => setView('checkin')}
                   >
-                    <Text style={styles.primaryText}>
-                      Check in at this launch
-                    </Text>
+                    <Text style={styles.primaryText}>Check in at this launch</Text>
                   </Pressable>
 
                   <Pressable style={styles.cancel} onPress={closeAll}>
@@ -228,6 +411,8 @@ export default function LaunchesScreen() {
                           value={prevQuery}
                           onChangeText={setPrevQuery}
                           style={styles.input}
+                          autoCorrect={false}
+                          autoCapitalize="none"
                         />
                         <FlatList
                           data={prevResults}
@@ -277,13 +462,9 @@ export default function LaunchesScreen() {
                       <>
                         <Pressable
                           style={styles.undecidedButton}
-                          onPress={() =>
-                            setNextWaterbody("Haven’t decided yet")
-                          }
+                          onPress={() => setNextWaterbody("Haven’t decided yet")}
                         >
-                          <Text style={styles.undecidedText}>
-                            Haven’t decided yet
-                          </Text>
+                          <Text style={styles.undecidedText}>Haven’t decided yet</Text>
                         </Pressable>
 
                         <TextInput
@@ -291,6 +472,8 @@ export default function LaunchesScreen() {
                           value={nextQuery}
                           onChangeText={setNextQuery}
                           style={styles.input}
+                          autoCorrect={false}
+                          autoCapitalize="none"
                         />
                         <FlatList
                           data={nextResults}
@@ -380,25 +563,100 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
+  /* 🔍 Launch search */
+  launchSearchWrap: {
+    position: 'absolute',
+    top: 10,
+    left: 12,
+    right: 12,
+    zIndex: 50,
+  },
+  launchSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderRadius: 16,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E7E7EA',
+  },
+  launchSearchInput: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontSize: 15,
+  },
+  clearBtn: {
+    marginLeft: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F2F2F7',
+  },
+  clearBtnText: {
+    fontSize: 24,
+    lineHeight: 24,
+    color: '#333',
+    marginTop: -1,
+  },
+  launchDropdown: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E7E7EA',
+  },
+  launchDropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFF4',
+  },
+  launchDropdownText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111',
+  },
+  launchDropdownMuted: {
+    fontSize: 14,
+    color: '#666',
+  },
+
   /* ℹ️ Floating hint */
   floatingHint: {
     position: 'absolute',
-    top: 12,
+    top: 76,
     left: 12,
     right: 12,
     backgroundColor: 'rgba(255,255,255,0.92)',
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E7E7EA',
   },
   hintText: {
-    fontSize: 12,
-    color: '#333',
+    fontSize: 12.5,
+    color: '#222',
     textAlign: 'center',
+    fontWeight: '600',
   },
 
   mapToggle: {
@@ -410,10 +668,10 @@ const styles = StyleSheet.create({
   mapToggleButton: {
     width: 64,
     height: 64,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: '#fff',
     overflow: 'hidden',
-    elevation: 6,
+    elevation: 7,
     borderWidth: 1,
     borderColor: '#ddd',
   },
@@ -430,7 +688,7 @@ const styles = StyleSheet.create({
   modalSafe: { maxHeight: '90%' },
   grabber: {
     alignSelf: 'center',
-    width: 40,
+    width: 44,
     height: 5,
     borderRadius: 3,
     backgroundColor: '#ccc',
@@ -439,8 +697,8 @@ const styles = StyleSheet.create({
   modal: {
     backgroundColor: '#F2F2F7',
     padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
   },
 
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
@@ -450,36 +708,41 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  cardTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
 
   selector: {
     padding: 12,
     backgroundColor: '#F2F2F7',
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 8,
   },
   selectorLabel: { fontSize: 12, color: '#666' },
-  selectorValue: { fontWeight: '600' },
+  selectorValue: { fontWeight: '700' },
 
   selectedRow: {
     backgroundColor: '#F2F2F7',
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     marginTop: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  selectedText: { fontWeight: '600' },
-  changeText: { color: '#007AFF', fontWeight: '600' },
+  selectedText: { fontWeight: '700' },
+  changeText: { color: '#007AFF', fontWeight: '700' },
 
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     marginTop: 8,
+    backgroundColor: '#fff',
   },
 
   resultItem: {
@@ -492,19 +755,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     padding: 12,
     backgroundColor: '#F2F2F7',
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  undecidedText: { fontWeight: '600' },
+  undecidedText: { fontWeight: '700' },
 
   primaryButton: {
     backgroundColor: '#007AFF',
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     marginTop: 12,
   },
-  primaryText: { color: 'white', fontWeight: '700' },
+  primaryText: { color: 'white', fontWeight: '800' },
   disabledButton: { opacity: 0.4 },
 
   cancel: {

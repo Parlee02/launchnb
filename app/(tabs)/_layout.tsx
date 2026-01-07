@@ -30,11 +30,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-
-        // show header
         headerShown: true,
-
-        // custom header
         headerTitle: () => <HeaderTitle />,
         headerTitleAlign: 'center',
       }}
@@ -71,6 +67,17 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* ℹ️ CDD */}
+      <Tabs.Screen
+        name="clean-drain-dry"
+        options={{
+          title: 'CDD',
+          tabBarIcon: ({ color }) => (
+            <FontAwesome name="info-circle" size={26} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
@@ -87,13 +94,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#000',
-    marginRight: -4, // 👈 controls distance to pin
+    marginRight: -4,
   },
 
   logo: {
-    width: 30,   // slightly smaller = tighter
+    width: 30,
     height: 30,
-    marginTop: 4, // optical alignment tweak
+    marginTop: 4,
   },
 });
-
