@@ -1,4 +1,5 @@
 import { supabase } from '@/supabaseClient';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { searchWaterbodies } from '../../lib/searchwaterbodies';
+import { onWaterbodySelected } from '../../lib/waterbodySelection';
 
 /* ---------------- TYPES ---------------- */
 
@@ -58,7 +60,9 @@ function toNumber(v: any): number | null {
  * - numbers or numeric strings
  */
 function normalizeLaunchRow(row: any, index: number): Launch | null {
-  const name = (row?.Name ?? row?.name ?? row?.launch_name ?? '').toString().trim();
+  const name = (row?.Name ?? row?.name ?? row?.launch_name ?? '')
+    .toString()
+    .trim();
 
   const lat =
     toNumber(row?.Latitude) ??
@@ -82,9 +86,10 @@ function normalizeLaunchRow(row: any, index: number): Launch | null {
 
   // Ensure stable, unique id even if table has null/duplicate ids
   const rawId = row?.id ?? row?.ID ?? row?.launch_id ?? row?.uuid;
-  const id = (rawId != null && String(rawId).trim().length > 0)
-    ? String(rawId)
-    : `row-${index}-${name}-${lat}-${lng}`;
+  const id =
+    rawId != null && String(rawId).trim().length > 0
+      ? String(rawId)
+      : `row-${index}-${name}-${lat}-${lng}`;
 
   return {
     id,
@@ -111,18 +116,20 @@ export default function LaunchesScreen() {
   const [showLaunchDropdown, setShowLaunchDropdown] = useState(false);
 
   const mapRef = useRef<MapView>(null);
+  const lastLaunchRef = useRef<Launch | null>(null);
 
-  /* Previous trip */
-  const [prevProvince, setPrevProvince] = useState('New Brunswick');
-  const [prevQuery, setPrevQuery] = useState('');
-  const [prevResults, setPrevResults] = useState<any[]>([]);
-  const [prevWaterbody, setPrevWaterbody] = useState<string | null>(null);
+/* Previous trip */
+const [prevProvince, setPrevProvince] = useState('New Brunswick');
+const [prevQuery, setPrevQuery] = useState('');
+const [prevResults, setPrevResults] = useState<any[]>([]);
+const [prevWaterbody, setPrevWaterbody] = useState<any | null>(null);
 
-  /* Next trip */
-  const [nextProvince, setNextProvince] = useState('New Brunswick');
-  const [nextQuery, setNextQuery] = useState('');
-  const [nextResults, setNextResults] = useState<any[]>([]);
-  const [nextWaterbody, setNextWaterbody] = useState<string | null>(null);
+/* Next trip */
+const [nextProvince, setNextProvince] = useState('New Brunswick');
+const [nextQuery, setNextQuery] = useState('');
+const [nextResults, setNextResults] = useState<any[]>([]);
+const [nextWaterbody, setNextWaterbody] = useState<any | null>(null);
+
 
   const canSubmit = !!prevWaterbody && !!nextWaterbody;
 
@@ -149,7 +156,9 @@ export default function LaunchesScreen() {
 
       // Helpful debug (you can delete later)
       console.log(
-        `launches loaded: raw=${raw.length} normalized=${normalized.length} dropped=${raw.length - normalized.length}`
+        `launches loaded: raw=${raw.length} normalized=${normalized.length} dropped=${
+          raw.length - normalized.length
+        }`
       );
 
       setLaunches(normalized);
@@ -158,6 +167,29 @@ export default function LaunchesScreen() {
 
     load();
   }, []);
+
+  /* ✅ LISTEN FOR MAP PICKER SELECTIONS */
+  useEffect(() => {
+  const unsub = onWaterbodySelected(({ target, waterbody }) => {
+    if (target === 'prev') {
+      setPrevWaterbody(waterbody);
+      setPrevResults([]);
+      setPrevQuery('');
+    } else {
+      setNextWaterbody(waterbody);
+      setNextResults([]);
+      setNextQuery('');
+    }
+
+    // ✅ RESTORE the launch modal
+    setSelectedLaunch(lastLaunchRef.current);
+    setView('checkin');
+  });
+
+  return () => {
+    if (typeof unsub === 'function') unsub();
+  };
+}, []);
 
   /* 🔍 Filter launches for markers + dropdown */
   const filteredLaunches = useMemo(() => {
@@ -202,23 +234,53 @@ export default function LaunchesScreen() {
     setShowLaunchDropdown(false);
   };
 
- const selectLaunchFromSearch = (l: Launch) => {
-  Keyboard.dismiss();
-  setShowLaunchDropdown(false);
+  const selectLaunchFromSearch = (l: Launch) => {
+    Keyboard.dismiss();
+    setShowLaunchDropdown(false);
 
-  setLaunchSearch(''); // ✅ IMPORTANT
-  setSelectedLaunch(l);
-  setView('prompt');
+    setLaunchSearch(''); // ✅ IMPORTANT
+    setSelectedLaunch(l);
+    setView('prompt');
 
-  mapRef.current?.animateToRegion(
-    {
-      latitude: l.Latitude,
-      longitude: l.Longitude,
-      latitudeDelta: 0.10,
-      longitudeDelta: 0.10,
-    },
-    350
-  );
+    mapRef.current?.animateToRegion(
+      {
+        latitude: l.Latitude,
+        longitude: l.Longitude,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
+      },
+      350
+    );
+  };
+
+ const openWaterbodyPicker = (
+  target: 'prev' | 'next',
+  province: string,
+  item: any
+) => {
+  const key =
+    (item?.search_name_norm ?? item?.search_name ?? '')
+      .toString()
+      .trim()
+      .toLowerCase();
+
+  // ✅ remember which launch opened the picker
+  lastLaunchRef.current = selectedLaunch;
+
+  // close modal
+  setSelectedLaunch(null);
+
+  requestAnimationFrame(() => {
+    router.push({
+      pathname: '/waterbody-picker',
+      params: {
+        target,
+        province,
+        key,
+        label: item?.search_name ?? 'Select location',
+      },
+    });
+  });
 };
 
   if (Platform.OS === 'web') {
@@ -261,10 +323,10 @@ export default function LaunchesScreen() {
 
           {!!launchSearch.trim() && (
             <Pressable
-             onPress={() => {
-  setShowLaunchDropdown(false);
-  Keyboard.dismiss();
-}}
+              onPress={() => {
+                setShowLaunchDropdown(false);
+                Keyboard.dismiss();
+              }}
               style={styles.clearBtn}
               hitSlop={10}
             >
@@ -394,7 +456,9 @@ export default function LaunchesScreen() {
 
                     {prevWaterbody ? (
                       <View style={styles.selectedRow}>
-                        <Text style={styles.selectedText}>{prevWaterbody}</Text>
+                        <Text style={styles.selectedText}>
+  {prevWaterbody?.search_name}
+</Text>
                         <Pressable
                           onPress={() => {
                             setPrevWaterbody(null);
@@ -422,6 +486,13 @@ export default function LaunchesScreen() {
                             <Pressable
                               style={styles.resultItem}
                               onPress={() => {
+                                // ✅ If duplicates, open map picker; else select directly
+                                if (Number(item?.name_count ?? 0) > 1) {
+                                  setPrevResults([]);
+                                  openWaterbodyPicker('prev', prevProvince, item);
+                                  return;
+                                }
+
                                 setPrevWaterbody(item.search_name);
                                 setPrevResults([]);
                               }}
@@ -448,7 +519,9 @@ export default function LaunchesScreen() {
 
                     {nextWaterbody ? (
                       <View style={styles.selectedRow}>
-                        <Text style={styles.selectedText}>{nextWaterbody}</Text>
+                        <Text style={styles.selectedText}>
+  {nextWaterbody?.search_name}
+</Text>
                         <Pressable
                           onPress={() => {
                             setNextWaterbody(null);
@@ -483,6 +556,13 @@ export default function LaunchesScreen() {
                             <Pressable
                               style={styles.resultItem}
                               onPress={() => {
+                                // ✅ If duplicates, open map picker; else select directly
+                                if (Number(item?.name_count ?? 0) > 1) {
+                                  setNextResults([]);
+                                  openWaterbodyPicker('next', nextProvince, item);
+                                  return;
+                                }
+
                                 setNextWaterbody(item.search_name);
                                 setNextResults([]);
                               }}
@@ -502,16 +582,82 @@ export default function LaunchesScreen() {
                       !canSubmit && styles.disabledButton,
                     ]}
                     onPress={async () => {
-                      await supabase.from('launch_checkins').insert({
-                        launch_id: selectedLaunch?.id,
-                        launch_name: selectedLaunch?.Name,
-                        prev_province: prevProvince,
-                        prev_waterbody: prevWaterbody,
-                        next_province: nextProvince,
-                        next_waterbody: nextWaterbody,
-                      });
-                      closeAll();
-                    }}
+  /* 1️⃣ INSERT CHECK-IN (this already works) */
+  const { error: checkinError } = await supabase
+    .from('launch_checkins')
+    .insert({
+      launch_id: selectedLaunch?.id,
+      launch_name: selectedLaunch?.Name,
+
+      prev_province: prevProvince,
+      prev_waterbody:
+        typeof prevWaterbody === 'string'
+          ? prevWaterbody
+          : prevWaterbody?.search_name ?? null,
+
+      next_province: nextProvince,
+      next_waterbody:
+        typeof nextWaterbody === 'string'
+          ? nextWaterbody
+          : nextWaterbody?.search_name ?? null,
+    });
+
+  if (checkinError) {
+    console.error('CHECKIN INSERT ERROR:', checkinError);
+    alert(checkinError.message);
+    return;
+  }
+
+  /* 2️⃣ BUILD FLOW ROWS */
+  const flowRows: any[] = [];
+
+  if (
+    prevWaterbody &&
+    typeof prevWaterbody !== 'string' &&
+    prevWaterbody.latitude &&
+    prevWaterbody.longitude
+  ) {
+    flowRows.push({
+      boat_launch: selectedLaunch?.Name,
+      movement_type: 'previous',
+      waterbody_name: prevWaterbody.search_name,
+      waterbody_lat: prevWaterbody.latitude,
+      waterbody_lon: prevWaterbody.longitude,
+    });
+  }
+
+  if (
+    nextWaterbody &&
+    typeof nextWaterbody !== 'string' &&
+    nextWaterbody.latitude &&
+    nextWaterbody.longitude
+  ) {
+    flowRows.push({
+      boat_launch: selectedLaunch?.Name,
+      movement_type: 'next',
+      waterbody_name: nextWaterbody.search_name,
+      waterbody_lat: nextWaterbody.latitude,
+      waterbody_lon: nextWaterbody.longitude,
+    });
+  }
+
+  /* 3️⃣ INSERT FLOWS (THIS IS THE MISSING LINK) */
+  if (flowRows.length > 0) {
+    const { error: flowError } = await supabase
+      .from('launch_flows_old')
+      .insert(flowRows);
+
+    if (flowError) {
+      console.error('FLOW INSERT ERROR:', flowError);
+      alert(flowError.message);
+      return;
+    }
+  }
+
+  /* 4️⃣ CLOSE MODAL */
+  closeAll();
+}}
+
                   >
                     <Text style={styles.primaryText}>Submit check-in</Text>
                   </Pressable>
@@ -534,6 +680,18 @@ export default function LaunchesScreen() {
                         view === 'province-prev'
                           ? setPrevProvince(p)
                           : setNextProvince(p);
+
+                        // When province changes, clear any selected waterbody + results for that section
+                        if (view === 'province-prev') {
+                          setPrevWaterbody(null);
+                          setPrevQuery('');
+                          setPrevResults([]);
+                        } else {
+                          setNextWaterbody(null);
+                          setNextQuery('');
+                          setNextResults([]);
+                        }
+
                         setView('checkin');
                       }}
                     >

@@ -67,7 +67,7 @@ export default function FlowMapScreen() {
       .from('launches')
       .select('*');
 
-    if (error) console.error(error);
+    if (error) console.error('loadLaunches error:', error);
 
     setLaunches(data ?? []);
     setLoadingLaunches(false);
@@ -77,13 +77,13 @@ export default function FlowMapScreen() {
     setLoadingFlows(true);
 
     const { data, error } = await supabase
-      .from('boater_movements')
+      .from('launch_flows_old')
       .select('*')
-      .eq('boat_launch', launchName);
+      .eq('boat_launch', launchName.trim());
 
-    if (error) console.error(error);
+    if (error) console.error('loadFlows error:', error);
 
-    setRows(data ?? []);
+    setRows((data as MovementRow[]) ?? []);
     setLoadingFlows(false);
   };
 
@@ -207,7 +207,7 @@ export default function FlowMapScreen() {
             };
 
             return (
-              <View key={i}>
+              <View key={`${f.name}-${i}`}>
                 <Polyline
                   coordinates={
                     mode === 'incoming'

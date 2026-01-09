@@ -3,8 +3,10 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
+/* ---------------- COLORS ---------------- */
+
+const IOS_BLUE = '#007AFF';
+const INACTIVE_GRAY = '#8E8E93';
 
 /* ---------- HEADER TITLE ---------- */
 
@@ -24,15 +26,21 @@ function HeaderTitle() {
 /* ---------- TABS ---------- */
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: true,
         headerTitle: () => <HeaderTitle />,
         headerTitleAlign: 'center',
+
+        /* 🎯 TAB COLORS */
+        tabBarActiveTintColor: IOS_BLUE,
+        tabBarInactiveTintColor: INACTIVE_GRAY,
+
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#E5E5EA',
+        },
       }}
     >
       {/* 🚤 Launches */}
