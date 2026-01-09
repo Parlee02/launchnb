@@ -29,6 +29,7 @@ type Launch = {
 type MovementRow = {
   boat_launch: string;
   movement_type: 'previous' | 'next';
+  waterbody_id: number | string;
   waterbody_name: string;
   waterbody_lat: number;
   waterbody_lon: number;
@@ -39,6 +40,7 @@ type Flow = {
   lat: number;
   lon: number;
   count: number;
+  waterbody_id: number | string;
 };
 
 type Mode = 'incoming' | 'outgoing';
@@ -60,38 +62,42 @@ export default function FlowMapScreen() {
 
   /* ---------------- DATA LOADING ---------------- */
 
-  const loadLaunches = async () => {
-    setLoadingLaunches(true);
+const loadLaunches = async () => {
+  setLoadingLaunches(true);
 
-    const { data, error } = await supabase
-      .from('launches')
-      .select('*');
+  const { data, error } = await supabase
+    .from('launches')
+    .select('*');
 
-    if (error) console.error('loadLaunches error:', error);
+  if (error) {
+    console.error('loadLaunches error:', error);
+  }
 
-    setLaunches(data ?? []);
-    setLoadingLaunches(false);
-  };
+  setLaunches(data ?? []);
+  setLoadingLaunches(false);
+};
 
-  const loadFlowsForLaunch = async (launchName: string) => {
-    setLoadingFlows(true);
+const loadFlowsForLaunch = async (launchName: string) => {
+  setLoadingFlows(true);
 
-    const { data, error } = await supabase
-      .from('launch_flows_old')
-      .select('*')
-      .eq('boat_launch', launchName.trim());
+  const { data, error } = await supabase
+    .from('launch_flows_v2') // ✅ USE THE VIEW, NOT launch_flows_old
+    .select('*')
+    .eq('boat_launch', launchName.trim());
 
-    if (error) console.error('loadFlows error:', error);
+  if (error) {
+    console.error('loadFlows error:', error);
+  }
 
-    setRows((data as MovementRow[]) ?? []);
-    setLoadingFlows(false);
-  };
+  setRows((data as MovementRow[]) ?? []);
+  setLoadingFlows(false);
+};
 
-  useFocusEffect(
-    useCallback(() => {
-      loadLaunches();
-    }, [])
-  );
+useFocusEffect(
+  useCallback(() => {
+    loadLaunches();
+  }, [])
+);
 
   /* ---------------- FLOW PROCESSING ---------------- */
 
@@ -109,15 +115,18 @@ export default function FlowMapScreen() {
     const map = new Map<string, Flow>();
 
     filteredRows.forEach(r => {
-      if (!map.has(r.waterbody_name)) {
-        map.set(r.waterbody_name, {
+      const key = String(r.waterbody_id);
+
+      if (!map.has(key)) {
+        map.set(key, {
+          waterbody_id: r.waterbody_id,
           name: r.waterbody_name,
           lat: r.waterbody_lat,
           lon: r.waterbody_lon,
           count: 1,
         });
       } else {
-        map.get(r.waterbody_name)!.count += 1;
+        map.get(key)!.count += 1;
       }
     });
 
@@ -200,14 +209,14 @@ export default function FlowMapScreen() {
 
         {/* FLOWS */}
         {selectedLaunch &&
-          flows.map((f, i) => {
+          flows.map(f => {
             const endPoint = {
               latitude: f.lat,
               longitude: f.lon,
             };
 
             return (
-              <View key={`${f.name}-${i}`}>
+              <View key={String(f.waterbody_id)}>
                 <Polyline
                   coordinates={
                     mode === 'incoming'
