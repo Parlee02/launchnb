@@ -4,10 +4,12 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -57,11 +59,17 @@ export default function FlowMapScreen() {
   const [loadingLaunches, setLoadingLaunches] = useState(true);
   const [loadingFlows, setLoadingFlows] = useState(false);
 
+  /* 🔍 LAUNCH SEARCH */
+  const [launchSearch, setLaunchSearch] = useState('');
+  const [showLaunchDropdown, setShowLaunchDropdown] = useState(false);
+
   /* 🗺️ MAP TYPE */
-  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+  const [mapType, setMapType] =
+    useState<'standard' | 'satellite'>('standard');
 
   /* ✅ Prevent UI overlay taps from also clearing MapView selection */
   const ignoreNextMapPressRef = useRef(false);
+  const mapRef = useRef<MapView>(null);
 
   /* ---------------- DATA LOADING ---------------- */
 
@@ -82,7 +90,7 @@ export default function FlowMapScreen() {
     setLoadingFlows(true);
 
     const { data, error } = await supabase
-      .from('launch_flows_v2') // ✅ USE THE VIEW, NOT launch_flows_old
+      .from('launch_flows_v2')
       .select('*')
       .eq('boat_launch', launchName.trim());
 
@@ -100,6 +108,40 @@ export default function FlowMapScreen() {
     }, [])
   );
 
+  /* ---------------- SEARCH LOGIC ---------------- */
+
+  const filteredLaunches = useMemo(() => {
+    const q = launchSearch.trim().toLowerCase();
+    if (!q) return [];
+
+    return launches.filter(l =>
+      l.Name.toLowerCase().includes(q)
+    );
+  }, [launches, launchSearch]);
+
+  const topLaunchMatches = filteredLaunches.slice(0, 8);
+
+  const selectLaunchFromSearch = (launch: Launch) => {
+    Keyboard.dismiss();
+    setShowLaunchDropdown(false);
+    setLaunchSearch('');
+
+    ignoreNextMapPressRef.current = true;
+    setSelectedLaunch(launch);
+    setSelectedFlow(null);
+    loadFlowsForLaunch(launch.Name);
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude: launch.Latitude,
+        longitude: launch.Longitude,
+        latitudeDelta: 0.15,
+        longitudeDelta: 0.15,
+      },
+      350
+    );
+  };
+
   /* ---------------- FLOW PROCESSING ---------------- */
 
   const filteredRows = useMemo(() => {
@@ -111,7 +153,6 @@ export default function FlowMapScreen() {
         : r.movement_type === 'next'
     );
 
-    // ✅ drop rows with bad coords (prevents “invisible” polylines)
     return modeFiltered.filter(r => {
       const lat = Number(r.waterbody_lat);
       const lon = Number(r.waterbody_lon);
@@ -123,10 +164,9 @@ export default function FlowMapScreen() {
     const map = new Map<string, Flow>();
 
     filteredRows.forEach(r => {
-      // ✅ collision-safe key (id + coords)
-      const key = `${String(r.waterbody_id)}-${Number(r.waterbody_lat)}-${Number(
-        r.waterbody_lon
-      )}`;
+      const key = `${String(r.waterbody_id)}-${Number(
+        r.waterbody_lat
+      )}-${Number(r.waterbody_lon)}`;
 
       if (!map.has(key)) {
         map.set(key, {
@@ -169,7 +209,71 @@ export default function FlowMapScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 🔍 LAUNCH SEARCH BAR */}
+      <View style={styles.launchSearchWrap}>
+        <View style={styles.launchSearchRow}>
+          <TextInput
+            placeholder="Search boat launches…"
+            value={launchSearch}
+            onChangeText={t => {
+              setLaunchSearch(t);
+              setShowLaunchDropdown(true);
+            }}
+            onFocus={() => setShowLaunchDropdown(true)}
+            style={styles.launchSearchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            placeholderTextColor="#7A7A7A"
+          />
+
+          {!!launchSearch.trim() && (
+            <Pressable
+              onPress={() => {
+                setLaunchSearch('');
+                setShowLaunchDropdown(false);
+                Keyboard.dismiss();
+              }}
+              style={styles.clearBtn}
+              hitSlop={10}
+            >
+              <Text style={styles.clearBtnText}>×</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {showLaunchDropdown && topLaunchMatches.length > 0 && (
+          <View style={styles.launchDropdown}>
+            {topLaunchMatches.map(item => (
+              <Pressable
+                key={item.id}
+                style={styles.launchDropdownItem}
+                onPress={() => selectLaunchFromSearch(item)}
+              >
+                <Text style={styles.launchDropdownText}>
+                  {item.Name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {showLaunchDropdown &&
+          !!launchSearch.trim() &&
+          topLaunchMatches.length === 0 && (
+            <View style={styles.launchDropdown}>
+              <View style={styles.launchDropdownItem}>
+                <Text style={styles.launchDropdownMuted}>
+                  No matches
+                </Text>
+              </View>
+            </View>
+          )}
+      </View>
+
+      {/* 🗺️ MAP */}
       <MapView
+        ref={mapRef}
         style={styles.map}
         mapType={mapType}
         initialRegion={{
@@ -179,7 +283,6 @@ export default function FlowMapScreen() {
           longitudeDelta: 4,
         }}
         onPress={() => {
-          // ✅ don’t clear when user taps overlays
           if (ignoreNextMapPressRef.current) {
             ignoreNextMapPressRef.current = false;
             return;
@@ -190,7 +293,6 @@ export default function FlowMapScreen() {
           setRows([]);
         }}
       >
-        {/* ALL LAUNCHES */}
         {!selectedLaunch &&
           launches.map(l => (
             <Marker
@@ -210,7 +312,6 @@ export default function FlowMapScreen() {
             />
           ))}
 
-        {/* SELECTED LAUNCH */}
         {selectedLaunch && (
           <Marker
             coordinate={{
@@ -223,7 +324,6 @@ export default function FlowMapScreen() {
           />
         )}
 
-        {/* FLOWS */}
         {selectedLaunch &&
           flows.map(f => {
             const endPoint = {
@@ -231,14 +331,13 @@ export default function FlowMapScreen() {
               longitude: Number(f.lon),
             };
 
-            // ✅ CRITICAL: include mode in keys to force remount
-            // react-native-maps can keep stale polylines otherwise
-            const renderKey = `${mode}-${String(f.waterbody_id)}-${endPoint.latitude}-${endPoint.longitude}`;
+            const renderKey = `${mode}-${String(
+              f.waterbody_id
+            )}-${endPoint.latitude}-${endPoint.longitude}`;
 
             return (
               <View key={renderKey}>
                 <Polyline
-                  key={`poly-${renderKey}`}
                   coordinates={
                     mode === 'incoming'
                       ? [
@@ -266,15 +365,24 @@ export default function FlowMapScreen() {
                 />
 
                 <Marker
-                  key={`mk-${renderKey}`}
                   coordinate={endPoint}
                   onPress={e => {
                     e.stopPropagation();
                     setSelectedFlow(f);
                   }}
                 >
-                  <View style={[styles.countBubble, { borderColor: activeColor }]}>
-                    <Text style={[styles.countText, { color: activeColor }]}>
+                  <View
+                    style={[
+                      styles.countBubble,
+                      { borderColor: activeColor },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.countText,
+                        { color: activeColor },
+                      ]}
+                    >
                       {f.count}
                     </Text>
                   </View>
@@ -284,18 +392,13 @@ export default function FlowMapScreen() {
           })}
       </MapView>
 
-      {/* ℹ️ FLOATING HINT */}
-      <View style={styles.floatingHint}>
-        <Text style={styles.hintText}>
-          Tap a launch to view incoming or outgoing boat movements
-        </Text>
-      </View>
-
       {/* ⏳ FLOW LOADING PILL */}
       {loadingFlows && selectedLaunch && (
         <View style={styles.loadingPill}>
           <ActivityIndicator size="small" />
-          <Text style={styles.loadingText}>Loading movements…</Text>
+          <Text style={styles.loadingText}>
+            Loading movements…
+          </Text>
         </View>
       )}
 
@@ -304,7 +407,9 @@ export default function FlowMapScreen() {
         <Pressable
           onPress={() => {
             ignoreNextMapPressRef.current = true;
-            setMapType(prev => (prev === 'standard' ? 'satellite' : 'standard'));
+            setMapType(prev =>
+              prev === 'standard' ? 'satellite' : 'standard'
+            );
           }}
           style={styles.mapToggleButton}
         >
@@ -350,7 +455,8 @@ export default function FlowMapScreen() {
               : `Outgoing to ${selectedFlow.name}`}
           </Text>
           <Text style={styles.infoSub}>
-            {selectedFlow.count} boat{selectedFlow.count > 1 ? 's' : ''}
+            {selectedFlow.count} boat
+            {selectedFlow.count > 1 ? 's' : ''}
           </Text>
         </View>
       )}
@@ -393,25 +499,77 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  floatingHint: {
+  /* 🔍 SEARCH */
+  launchSearchWrap: {
     position: 'absolute',
-    top: 12,
+    top: 10,
     left: 12,
     right: 12,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    elevation: 4,
+    zIndex: 50,
   },
-  hintText: {
-    fontSize: 12,
-    textAlign: 'center',
+  launchSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderRadius: 16,
+    padding: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E7E7EA',
+  },
+  launchSearchInput: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontSize: 15,
+  },
+
+  clearBtn: {
+    marginLeft: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F2F2F7',
+  },
+  clearBtnText: {
+    fontSize: 24,
+    lineHeight: 24,
+    color: '#333',
+    marginTop: -1,
+  },
+
+  launchDropdown: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E7E7EA',
+  },
+  launchDropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFF4',
+  },
+  launchDropdownText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111',
+  },
+  launchDropdownMuted: {
+    fontSize: 14,
+    color: '#666',
   },
 
   loadingPill: {
     position: 'absolute',
-    top: 60,
+    top: 64,
     alignSelf: 'center',
     flexDirection: 'row',
     gap: 8,
@@ -448,7 +606,7 @@ const styles = StyleSheet.create({
 
   toggleOverlay: {
     position: 'absolute',
-    top: 64,
+    top: 76,
     alignSelf: 'center',
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -474,18 +632,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
- infoOverlay: {
-  position: 'absolute',
-  bottom: 24,
-  left: 16,
-  right: 96,      // 👈 INCREASE this (was 72)
-  backgroundColor: '#fff',
-  paddingHorizontal: 16,
-  paddingVertical: 12,
-  borderRadius: 12,
-  elevation: 8,
-},
-
+  infoOverlay: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 96,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    elevation: 8,
+  },
 
   infoTitle: {
     fontWeight: '600',

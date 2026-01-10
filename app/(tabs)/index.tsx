@@ -378,16 +378,18 @@ const [nextWaterbody, setNextWaterbody] = useState<any | null>(null);
         }}
       >
         {markers.map(l => (
-          <Marker
-            key={l.id}
-            coordinate={{ latitude: l.Latitude, longitude: l.Longitude }}
-            title={l.Name}
-            onPress={() => {
-              setSelectedLaunch(l);
-              setView('prompt');
-            }}
-          />
-        ))}
+  <Marker
+    key={l.id}
+    coordinate={{ latitude: l.Latitude, longitude: l.Longitude }}
+    title={l.Name}
+    pinColor="red"   // 👈 ADD THIS
+    onPress={() => {
+      setSelectedLaunch(l);
+      setView('prompt');
+    }}
+  />
+))}
+
       </MapView>
 
       {/* ℹ️ FLOATING HINT */}

@@ -38,7 +38,7 @@ export default function DeconMapScreen() {
   const [stations, setStations] = useState<DeconStation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /* 🔍 SEARCH */
+  /* 🔍 SEARCH (DROPDOWN ONLY) */
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -71,27 +71,28 @@ export default function DeconMapScreen() {
     setLoading(false);
   };
 
-  /* ---------------- FILTERING ---------------- */
+  /* ---------------- MAP STATIONS (NO SEARCH FILTER) ---------------- */
 
-  const filteredStations = useMemo(() => {
-    const byProvince = stations.filter(s => {
+  const mapStations = useMemo(() => {
+    return stations.filter(s => {
       if (province === 'NB') return s.station_id?.startsWith('NB');
       if (province === 'QC') return s.station_id?.startsWith('STA');
       return true;
     });
+  }, [stations, province]);
 
+  /* ---------------- SEARCH RESULTS (DROPDOWN ONLY) ---------------- */
+
+  const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return byProvince;
+    if (!q) return [];
 
-    return byProvince.filter(s =>
+    return mapStations.filter(s =>
       (s.station_name ?? '').toLowerCase().includes(q)
     );
-  }, [stations, province, searchQuery]);
+  }, [mapStations, searchQuery]);
 
-  const topMatches = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    return filteredStations.slice(0, 8);
-  }, [filteredStations, searchQuery]);
+  const topMatches = searchResults.slice(0, 8);
 
   const selectStation = (station: DeconStation) => {
     Keyboard.dismiss();
@@ -234,7 +235,7 @@ export default function DeconMapScreen() {
           Keyboard.dismiss();
         }}
       >
-        {filteredStations.map(station => {
+        {mapStations.map(station => {
           const isQC = station.station_id.startsWith('STA');
 
           return (
@@ -341,21 +342,9 @@ export default function DeconMapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
 
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-
-  searchWrap: {
-    position: 'absolute',
-    top: 10,
-    left: 12,
-    right: 12,
-    zIndex: 50,
-  },
+  searchWrap: { position: 'absolute', top: 10, left: 12, right: 12, zIndex: 50 },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -383,10 +372,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#F2F2F7',
   },
-  clearBtnText: {
-    fontSize: 24,
-    marginTop: -1,
-  },
+  clearBtnText: { fontSize: 24, marginTop: -1 },
 
   dropdown: {
     marginTop: 10,
@@ -401,10 +387,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#EFEFF4',
   },
-  dropdownText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  dropdownText: { fontSize: 14, fontWeight: '600' },
 
   provinceToggle: {
     position: 'absolute',
@@ -425,16 +408,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#F2F2F7',
   },
-  provinceBtnActive: {
-    backgroundColor: '#007aff',
-  },
-  provinceText: {
-    fontWeight: '600',
-    color: '#333',
-  },
-  provinceTextActive: {
-    color: '#fff',
-  },
+  provinceBtnActive: { backgroundColor: '#007aff' },
+  provinceText: { fontWeight: '600', color: '#333' },
+  provinceTextActive: { color: '#fff' },
 
   pin: {
     width: 44,
@@ -457,33 +433,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pinImage: {
-    width: 18,
-    height: 18,
-    resizeMode: 'contain',
-  },
+  pinImage: { width: 18, height: 18, resizeMode: 'contain' },
 
-  pinQC: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  pinInnerQC: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  pinImageQC: {
-    width: 14,
-    height: 14,
-    resizeMode: 'contain',
-  },
+  pinQC: { width: 34, height: 34, borderRadius: 17 },
+  pinInnerQC: { width: 20, height: 20, borderRadius: 10 },
+  pinImageQC: { width: 14, height: 14, resizeMode: 'contain' },
 
-  mapToggle: {
-    position: 'absolute',
-    bottom: 24,
-    right: 16,
-  },
+  mapToggle: { position: 'absolute', bottom: 24, right: 16 },
   mapToggleButton: {
     width: 64,
     height: 64,
@@ -494,8 +450,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  mapToggleImage: {
-    width: '100%',
-    height: '100%',
-  },
+  mapToggleImage: { width: '100%', height: '100%' },
 });
