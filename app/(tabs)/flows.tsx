@@ -209,6 +209,7 @@ export default function FlowMapScreen() {
 
   return (
     <View style={styles.container}>
+
       {/* 🔍 LAUNCH SEARCH BAR */}
       <View style={styles.launchSearchWrap}>
         <View style={styles.launchSearchRow}>
@@ -337,6 +338,7 @@ export default function FlowMapScreen() {
 
             return (
               <View key={renderKey}>
+
                 <Polyline
                   coordinates={
                     mode === 'incoming'
