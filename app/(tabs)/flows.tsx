@@ -159,21 +159,21 @@ useFocusEffect(
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        mapType={mapType}
-        initialRegion={{
-          latitude: 46,
-          longitude: -66.8,
-          latitudeDelta: 4,
-          longitudeDelta: 4,
-        }}
-        onPress={() => {
-          setSelectedLaunch(null);
-          setSelectedFlow(null);
-          setRows([]);
-        }}
-      >
+<MapView
+  style={styles.map}
+  mapType={mapType}
+  initialRegion={{
+    latitude: 46,
+    longitude: -66.8,
+    latitudeDelta: 4,
+    longitudeDelta: 4,
+  }}
+  onPress={() => {
+    setSelectedLaunch(null);
+    setSelectedFlow(null);
+    setRows([]);
+  }}
+>
         {/* ALL LAUNCHES */}
         {!selectedLaunch &&
           launches.map(l => (
@@ -216,7 +216,7 @@ useFocusEffect(
             };
 
             return (
-              <View key={String(f.waterbody_id)}>
+              <View key={`${mode}-${f.waterbody_id}`}>
                 <Polyline
                   coordinates={
                     mode === 'incoming'
