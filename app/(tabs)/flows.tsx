@@ -1,6 +1,6 @@
 import { supabase } from '@/supabaseClient';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -60,69 +60,80 @@ export default function FlowMapScreen() {
   /* 🗺️ MAP TYPE */
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
 
+  /* ✅ Prevent UI overlay taps from also clearing MapView selection */
+  const ignoreNextMapPressRef = useRef(false);
+
   /* ---------------- DATA LOADING ---------------- */
 
-const loadLaunches = async () => {
-  setLoadingLaunches(true);
+  const loadLaunches = async () => {
+    setLoadingLaunches(true);
 
-  const { data, error } = await supabase
-    .from('launches')
-    .select('*');
+    const { data, error } = await supabase.from('launches').select('*');
 
-  if (error) {
-    console.error('loadLaunches error:', error);
-  }
+    if (error) {
+      console.error('loadLaunches error:', error);
+    }
 
-  setLaunches(data ?? []);
-  setLoadingLaunches(false);
-};
+    setLaunches(data ?? []);
+    setLoadingLaunches(false);
+  };
 
-const loadFlowsForLaunch = async (launchName: string) => {
-  setLoadingFlows(true);
+  const loadFlowsForLaunch = async (launchName: string) => {
+    setLoadingFlows(true);
 
-  const { data, error } = await supabase
-    .from('launch_flows_v2') // ✅ USE THE VIEW, NOT launch_flows_old
-    .select('*')
-    .eq('boat_launch', launchName.trim());
+    const { data, error } = await supabase
+      .from('launch_flows_v2') // ✅ USE THE VIEW, NOT launch_flows_old
+      .select('*')
+      .eq('boat_launch', launchName.trim());
 
-  if (error) {
-    console.error('loadFlows error:', error);
-  }
+    if (error) {
+      console.error('loadFlows error:', error);
+    }
 
-  setRows((data as MovementRow[]) ?? []);
-  setLoadingFlows(false);
-};
+    setRows((data as MovementRow[]) ?? []);
+    setLoadingFlows(false);
+  };
 
-useFocusEffect(
-  useCallback(() => {
-    loadLaunches();
-  }, [])
-);
+  useFocusEffect(
+    useCallback(() => {
+      loadLaunches();
+    }, [])
+  );
 
   /* ---------------- FLOW PROCESSING ---------------- */
 
   const filteredRows = useMemo(() => {
     if (!selectedLaunch) return [];
 
-    return rows.filter(r =>
+    const modeFiltered = rows.filter(r =>
       mode === 'incoming'
         ? r.movement_type === 'previous'
         : r.movement_type === 'next'
     );
+
+    // ✅ drop rows with bad coords (prevents “invisible” polylines)
+    return modeFiltered.filter(r => {
+      const lat = Number(r.waterbody_lat);
+      const lon = Number(r.waterbody_lon);
+      return Number.isFinite(lat) && Number.isFinite(lon);
+    });
   }, [rows, selectedLaunch, mode]);
 
   const flows: Flow[] = useMemo(() => {
     const map = new Map<string, Flow>();
 
     filteredRows.forEach(r => {
-      const key = String(r.waterbody_id);
+      // ✅ collision-safe key (id + coords)
+      const key = `${String(r.waterbody_id)}-${Number(r.waterbody_lat)}-${Number(
+        r.waterbody_lon
+      )}`;
 
       if (!map.has(key)) {
         map.set(key, {
           waterbody_id: r.waterbody_id,
           name: r.waterbody_name,
-          lat: r.waterbody_lat,
-          lon: r.waterbody_lon,
+          lat: Number(r.waterbody_lat),
+          lon: Number(r.waterbody_lon),
           count: 1,
         });
       } else {
@@ -152,8 +163,7 @@ useFocusEffect(
     );
   }
 
-  const activeColor =
-    mode === 'incoming' ? INCOMING_COLOR : OUTGOING_COLOR;
+  const activeColor = mode === 'incoming' ? INCOMING_COLOR : OUTGOING_COLOR;
 
   /* ---------------- RENDER ---------------- */
 
@@ -169,6 +179,12 @@ useFocusEffect(
           longitudeDelta: 4,
         }}
         onPress={() => {
+          // ✅ don’t clear when user taps overlays
+          if (ignoreNextMapPressRef.current) {
+            ignoreNextMapPressRef.current = false;
+            return;
+          }
+
           setSelectedLaunch(null);
           setSelectedFlow(null);
           setRows([]);
@@ -211,13 +227,18 @@ useFocusEffect(
         {selectedLaunch &&
           flows.map(f => {
             const endPoint = {
-              latitude: f.lat,
-              longitude: f.lon,
+              latitude: Number(f.lat),
+              longitude: Number(f.lon),
             };
 
+            // ✅ CRITICAL: include mode in keys to force remount
+            // react-native-maps can keep stale polylines otherwise
+            const renderKey = `${mode}-${String(f.waterbody_id)}-${endPoint.latitude}-${endPoint.longitude}`;
+
             return (
-              <View key={String(f.waterbody_id)}>
+              <View key={renderKey}>
                 <Polyline
+                  key={`poly-${renderKey}`}
                   coordinates={
                     mode === 'incoming'
                       ? [
@@ -245,24 +266,15 @@ useFocusEffect(
                 />
 
                 <Marker
+                  key={`mk-${renderKey}`}
                   coordinate={endPoint}
                   onPress={e => {
                     e.stopPropagation();
                     setSelectedFlow(f);
                   }}
                 >
-                  <View
-                    style={[
-                      styles.countBubble,
-                      { borderColor: activeColor },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.countText,
-                        { color: activeColor },
-                      ]}
-                    >
+                  <View style={[styles.countBubble, { borderColor: activeColor }]}>
+                    <Text style={[styles.countText, { color: activeColor }]}>
                       {f.count}
                     </Text>
                   </View>
@@ -290,11 +302,10 @@ useFocusEffect(
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
         <Pressable
-          onPress={() =>
-            setMapType(prev =>
-              prev === 'standard' ? 'satellite' : 'standard'
-            )
-          }
+          onPress={() => {
+            ignoreNextMapPressRef.current = true;
+            setMapType(prev => (prev === 'standard' ? 'satellite' : 'standard'));
+          }}
           style={styles.mapToggleButton}
         >
           <Image
@@ -314,6 +325,7 @@ useFocusEffect(
           label="Incoming"
           active={mode === 'incoming'}
           onPress={() => {
+            ignoreNextMapPressRef.current = true;
             setMode('incoming');
             setSelectedFlow(null);
           }}
@@ -322,6 +334,7 @@ useFocusEffect(
           label="Outgoing"
           active={mode === 'outgoing'}
           onPress={() => {
+            ignoreNextMapPressRef.current = true;
             setMode('outgoing');
             setSelectedFlow(null);
           }}
@@ -337,8 +350,7 @@ useFocusEffect(
               : `Outgoing to ${selectedFlow.name}`}
           </Text>
           <Text style={styles.infoSub}>
-            {selectedFlow.count} boat
-            {selectedFlow.count > 1 ? 's' : ''}
+            {selectedFlow.count} boat{selectedFlow.count > 1 ? 's' : ''}
           </Text>
         </View>
       )}
@@ -463,15 +475,16 @@ const styles = StyleSheet.create({
   },
 
   infoOverlay: {
-    position: 'absolute',
-    bottom: 24,
-    alignSelf: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    elevation: 8,
-  },
+  position: 'absolute',
+  bottom: 24,
+  left: 16,          // 👈 push to the left
+  right: 72,         // 👈 leave space so it doesn’t hit the edge
+  backgroundColor: '#fff',
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  borderRadius: 12,
+  elevation: 8,
+},
 
   infoTitle: {
     fontWeight: '600',
