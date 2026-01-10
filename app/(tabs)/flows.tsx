@@ -474,17 +474,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  infoOverlay: {
+ infoOverlay: {
   position: 'absolute',
   bottom: 24,
-  left: 16,          // 👈 push to the left
-  right: 72,         // 👈 leave space so it doesn’t hit the edge
+  left: 16,
+  right: 96,      // 👈 INCREASE this (was 72)
   backgroundColor: '#fff',
   paddingHorizontal: 16,
   paddingVertical: 12,
   borderRadius: 12,
   elevation: 8,
 },
+
 
   infoTitle: {
     fontWeight: '600',
