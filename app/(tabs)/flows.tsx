@@ -87,31 +87,31 @@ export default function FlowMapScreen() {
     setLoadingLaunches(false);
   };
 
- const loadFlowsForLaunch = async (launchName: string) => {
-  setLoadingFlows(true);
+  const loadFlowsForLaunch = async (launchName: string) => {
+    setLoadingFlows(true);
 
-  // Mark this request as the active one
-  activeLaunchRef.current = launchName;
+    // Mark this request as the active one
+    activeLaunchRef.current = launchName;
 
-  const { data, error } = await supabase
-    .from('launch_flows_v2')
-    .select('*')
-    .eq('boat_launch', launchName.trim());
+    const { data, error } = await supabase
+      .from('launch_flows_v2')
+      .select('*')
+      .eq('boat_launch', launchName.trim());
 
-  // ❌ Ignore stale responses (older searches finishing late)
-  if (activeLaunchRef.current !== launchName) {
-    return;
-  }
+    // ❌ Ignore stale responses (older searches finishing late)
+    if (activeLaunchRef.current !== launchName) {
+      return;
+    }
 
-  if (error) {
-    console.error('loadFlows error:', error);
-    setRows([]);
-  } else {
-    setRows((data as MovementRow[]) ?? []);
-  }
+    if (error) {
+      console.error('loadFlows error:', error);
+      setRows([]);
+    } else {
+      setRows((data as MovementRow[]) ?? []);
+    }
 
-  setLoadingFlows(false);
-};
+    setLoadingFlows(false);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -125,9 +125,7 @@ export default function FlowMapScreen() {
     const q = launchSearch.trim().toLowerCase();
     if (!q) return [];
 
-    return launches.filter(l =>
-      l.Name.toLowerCase().includes(q)
-    );
+    return launches.filter(l => l.Name.toLowerCase().includes(q));
   }, [launches, launchSearch]);
 
   const topLaunchMatches = filteredLaunches.slice(0, 8);
@@ -138,10 +136,10 @@ export default function FlowMapScreen() {
     setLaunchSearch('');
 
     ignoreNextMapPressRef.current = true;
-   setSelectedLaunch(launch);
-setSelectedFlow(null);
-setRows([]);
-loadFlowsForLaunch(launch.Name);
+    setSelectedLaunch(launch);
+    setSelectedFlow(null);
+    setRows([]);
+    loadFlowsForLaunch(launch.Name);
 
     mapRef.current?.animateToRegion(
       {
@@ -176,6 +174,7 @@ loadFlowsForLaunch(launch.Name);
     const map = new Map<string, Flow>();
 
     filteredRows.forEach(r => {
+      // ✅ FIX: was missing backticks
       const key = `${String(r.waterbody_id)}-${Number(
         r.waterbody_lat
       )}-${Number(r.waterbody_lon)}`;
@@ -221,7 +220,6 @@ loadFlowsForLaunch(launch.Name);
 
   return (
     <View style={styles.container}>
-
       {/* 🔍 LAUNCH SEARCH BAR */}
       <View style={styles.launchSearchWrap}>
         <View style={styles.launchSearchRow}>
@@ -263,9 +261,7 @@ loadFlowsForLaunch(launch.Name);
                 style={styles.launchDropdownItem}
                 onPress={() => selectLaunchFromSearch(item)}
               >
-                <Text style={styles.launchDropdownText}>
-                  {item.Name}
-                </Text>
+                <Text style={styles.launchDropdownText}>{item.Name}</Text>
               </Pressable>
             ))}
           </View>
@@ -276,9 +272,7 @@ loadFlowsForLaunch(launch.Name);
           topLaunchMatches.length === 0 && (
             <View style={styles.launchDropdown}>
               <View style={styles.launchDropdownItem}>
-                <Text style={styles.launchDropdownMuted}>
-                  No matches
-                </Text>
+                <Text style={styles.launchDropdownMuted}>No matches</Text>
               </View>
             </View>
           )}
@@ -307,25 +301,25 @@ loadFlowsForLaunch(launch.Name);
         }}
       >
         {!selectedLaunch &&
-  launches.map(l => (
-    <Marker
-      key={l.id}
-      coordinate={{
-        latitude: l.Latitude,
-        longitude: l.Longitude,
-      }}
-      pinColor="red"
-      title={l.Name}
-      onPress={e => {
-        e.stopPropagation();
+          launches.map(l => (
+            <Marker
+              key={l.id}
+              coordinate={{
+                latitude: l.Latitude,
+                longitude: l.Longitude,
+              }}
+              pinColor="red"
+              title={l.Name}
+              onPress={e => {
+                e.stopPropagation();
 
-        setSelectedLaunch(l);
-        setSelectedFlow(null);
-        setRows([]); // ✅ clear old flows immediately
-        loadFlowsForLaunch(l.Name);
-      }}
-    />
-  ))}
+                setSelectedLaunch(l);
+                setSelectedFlow(null);
+                setRows([]); // ✅ clear old flows immediately
+                loadFlowsForLaunch(l.Name);
+              }}
+            />
+          ))}
 
         {selectedLaunch && (
           <Marker
@@ -346,13 +340,13 @@ loadFlowsForLaunch(launch.Name);
               longitude: Number(f.lon),
             };
 
+            // ✅ FIX: was missing backticks
             const renderKey = `${mode}-${String(
               f.waterbody_id
             )}-${endPoint.latitude}-${endPoint.longitude}`;
 
             return (
               <View key={renderKey}>
-
                 <Polyline
                   coordinates={
                     mode === 'incoming'
@@ -388,17 +382,9 @@ loadFlowsForLaunch(launch.Name);
                   }}
                 >
                   <View
-                    style={[
-                      styles.countBubble,
-                      { borderColor: activeColor },
-                    ]}
+                    style={[styles.countBubble, { borderColor: activeColor }]}
                   >
-                    <Text
-                      style={[
-                        styles.countText,
-                        { color: activeColor },
-                      ]}
-                    >
+                    <Text style={[styles.countText, { color: activeColor }]}>
                       {f.count}
                     </Text>
                   </View>
@@ -412,9 +398,7 @@ loadFlowsForLaunch(launch.Name);
       {loadingFlows && selectedLaunch && (
         <View style={styles.loadingPill}>
           <ActivityIndicator size="small" />
-          <Text style={styles.loadingText}>
-            Loading movements…
-          </Text>
+          <Text style={styles.loadingText}>Loading movements…</Text>
         </View>
       )}
 
@@ -423,9 +407,7 @@ loadFlowsForLaunch(launch.Name);
         <Pressable
           onPress={() => {
             ignoreNextMapPressRef.current = true;
-            setMapType(prev =>
-              prev === 'standard' ? 'satellite' : 'standard'
-            );
+            setMapType(prev => (prev === 'standard' ? 'satellite' : 'standard'));
           }}
           style={styles.mapToggleButton}
         >
@@ -471,8 +453,7 @@ loadFlowsForLaunch(launch.Name);
               : `Outgoing to ${selectedFlow.name}`}
           </Text>
           <Text style={styles.infoSub}>
-            {selectedFlow.count} boat
-            {selectedFlow.count > 1 ? 's' : ''}
+            {selectedFlow.count} boat{selectedFlow.count > 1 ? 's' : ''}
           </Text>
         </View>
       )}

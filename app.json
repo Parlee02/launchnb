@@ -8,6 +8,13 @@
     "scheme": "launchnb",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
+    "extra": {
+      "eas": {
+        "projectId": "8fa52c02-735b-41d5-91c1-c86927462981"
+      }
+    },
+
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
