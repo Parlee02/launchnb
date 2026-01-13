@@ -26,6 +26,17 @@ type DeconStation = {
   operational_status: string;
 };
 
+type MobileDeconStation = {
+  id: string;
+  organization: string | null;
+  station_name: string;
+  latitude: number;
+  longitude: number;
+  start_time: string;
+  end_time: string;
+  notes: string | null;
+};
+
 type Province = 'NB' | 'QC';
 
 /* ---------------- CONSTANTS ---------------- */
@@ -36,24 +47,24 @@ const DECON_RADIUS_METERS = 5000;
 
 export default function DeconMapScreen() {
   const [stations, setStations] = useState<DeconStation[]>([]);
+  const [mobileStations, setMobileStations] = useState<MobileDeconStation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /* 🔍 SEARCH (DROPDOWN ONLY) */
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
-  /* 🧭 PROVINCE */
   const [province, setProvince] = useState<Province>('NB');
 
-  /* 🗺️ MAP */
   const [mapType, setMapType] =
     useState<'standard' | 'satellite'>('standard');
+
   const mapRef = useRef<MapView>(null);
 
   /* ---------------- DATA ---------------- */
 
   useEffect(() => {
     fetchStations();
+    fetchMobileStations();
   }, []);
 
   const fetchStations = async () => {
@@ -71,26 +82,41 @@ export default function DeconMapScreen() {
     setLoading(false);
   };
 
-  /* ---------------- MAP STATIONS (NO SEARCH FILTER) ---------------- */
+  const fetchMobileStations = async () => {
+    const now = new Date().toISOString();
 
-  const mapStations = useMemo(() => {
+    const { data, error } = await supabase
+      .from('mobile_decon_stations')
+      .select('*')
+      .lte('start_time', now)
+      .gte('end_time', now);
+
+    if (error) {
+      console.error('Mobile stations error:', error.message);
+      return;
+    }
+
+    setMobileStations(data ?? []);
+  };
+
+  /* ---------------- STATION FILTERING ---------------- */
+
+  const mapStations = useMemo(() => stations, [stations]);
+
+  const searchableStations = useMemo(() => {
     return stations.filter(s => {
-      if (province === 'NB') return s.station_id?.startsWith('NB');
-      if (province === 'QC') return s.station_id?.startsWith('STA');
-      return true;
+      const isQC = s.station_id.startsWith('STA');
+      return province === 'NB' ? !isQC : isQC;
     });
   }, [stations, province]);
-
-  /* ---------------- SEARCH RESULTS (DROPDOWN ONLY) ---------------- */
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
-
-    return mapStations.filter(s =>
-      (s.station_name ?? '').toLowerCase().includes(q)
+    return searchableStations.filter(s =>
+      s.station_name.toLowerCase().includes(q)
     );
-  }, [mapStations, searchQuery]);
+  }, [searchableStations, searchQuery]);
 
   const topMatches = searchResults.slice(0, 8);
 
@@ -109,8 +135,6 @@ export default function DeconMapScreen() {
       350
     );
   };
-
-  /* 🚗 DIRECTIONS */
 
   const openDirections = (lat: number, lon: number) => {
     const url =
@@ -199,8 +223,10 @@ export default function DeconMapScreen() {
             key={p}
             onPress={() => {
               setProvince(p);
-              setSearchQuery('');
-              setShowDropdown(false);
+              setTimeout(() => {
+                setSearchQuery('');
+                setShowDropdown(false);
+              }, 0);
             }}
             style={[
               styles.provinceBtn,
@@ -235,11 +261,17 @@ export default function DeconMapScreen() {
           Keyboard.dismiss();
         }}
       >
+        {/* PERMANENT STATIONS */}
         {mapStations.map(station => {
           const isQC = station.station_id.startsWith('STA');
+          const visible = province === 'NB' ? !isQC : isQC;
 
           return (
-            <View key={station.station_id}>
+            <View
+              key={station.station_id}
+              pointerEvents={visible ? 'auto' : 'none'}
+              style={{ opacity: visible ? 1 : 0 }}
+            >
               <Circle
                 center={{
                   latitude: station.latitude,
@@ -289,7 +321,8 @@ export default function DeconMapScreen() {
                     </Text>
 
                     {station.location_name &&
-                      station.location_name !== station.station_name && (
+                      station.location_name !==
+                        station.station_name && (
                         <Text>{station.location_name}</Text>
                       )}
 
@@ -311,14 +344,121 @@ export default function DeconMapScreen() {
             </View>
           );
         })}
+
+        {/* 🟢 MOBILE STATIONS */}
+        {mobileStations.map(station => {
+          const visible = province === 'NB';
+
+          return (
+            <View
+              key={station.id}
+              pointerEvents={visible ? 'auto' : 'none'}
+              style={{ opacity: visible ? 1 : 0 }}
+            >
+              <Circle
+                center={{
+                  latitude: station.latitude,
+                  longitude: station.longitude,
+                }}
+                radius={DECON_RADIUS_METERS}
+                strokeColor="rgba(52,199,89,0.6)"
+                fillColor="rgba(52,199,89,0.18)"
+                strokeWidth={2}
+              />
+
+              <Marker
+                coordinate={{
+                  latitude: station.latitude,
+                  longitude: station.longitude,
+                }}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <View style={styles.pinMobile}>
+                  <View style={styles.pinInner}>
+                    <Image
+                      source={require('@/assets/decon.png')}
+                      style={styles.pinImage}
+                    />
+                  </View>
+                </View>
+
+                <Callout
+                  onPress={() =>
+                    openDirections(
+                      station.latitude,
+                      station.longitude
+                    )
+                  }
+                >
+                  <View style={{ width: 220 }}>
+                    <Text style={{ fontWeight: '600' }}>
+                      {station.station_name}
+                    </Text>
+
+                    {station.organization && (
+                      <Text>{station.organization}</Text>
+                    )}
+
+                    <Text>
+                      {new Date(
+                        station.start_time
+                      ).toLocaleString()}{' '}
+                      –{' '}
+                      {new Date(
+                        station.end_time
+                      ).toLocaleTimeString()}
+                    </Text>
+
+                    {station.notes && (
+                      <Text>{station.notes}</Text>
+                    )}
+
+                    <Text
+                      style={{
+                        marginTop: 8,
+                        color: '#007aff',
+                        fontWeight: '600',
+                      }}
+                    >
+                      Directions →
+                    </Text>
+                  </View>
+                </Callout>
+              </Marker>
+            </View>
+          );
+        })}
       </MapView>
+
+      {/* 🗂️ LEGEND */}
+      <View style={styles.legend}>
+        <View style={styles.legendRow}>
+          <View
+            style={[styles.legendDot, styles.legendDotBlue]}
+          />
+          <Text style={styles.legendText}>
+            Permanent decon station
+          </Text>
+        </View>
+
+        <View style={styles.legendRow}>
+          <View
+            style={[styles.legendDot, styles.legendDotGreen]}
+          />
+          <Text style={styles.legendText}>
+            Mobile / temporary station
+          </Text>
+        </View>
+      </View>
 
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
         <Pressable
           onPress={() =>
             setMapType(prev =>
-              prev === 'standard' ? 'satellite' : 'standard'
+              prev === 'standard'
+                ? 'satellite'
+                : 'standard'
             )
           }
           style={styles.mapToggleButton}
@@ -342,9 +482,20 @@ export default function DeconMapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
 
-  searchWrap: { position: 'absolute', top: 10, left: 12, right: 12, zIndex: 50 },
+  searchWrap: {
+    position: 'absolute',
+    top: 10,
+    left: 12,
+    right: 12,
+    zIndex: 50,
+  },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -395,21 +546,29 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 4,
+    borderRadius: 24,
+    padding: 6,
     elevation: 6,
     borderWidth: 1,
     borderColor: '#E7E7EA',
     zIndex: 40,
   },
   provinceBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 20,
     backgroundColor: '#F2F2F7',
+    minHeight: 44,
+    minWidth: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   provinceBtnActive: { backgroundColor: '#007aff' },
-  provinceText: { fontWeight: '600', color: '#333' },
+  provinceText: {
+    fontWeight: '700',
+    fontSize: 16,
+    color: '#333',
+  },
   provinceTextActive: { color: '#fff' },
 
   pin: {
@@ -439,7 +598,24 @@ const styles = StyleSheet.create({
   pinInnerQC: { width: 20, height: 20, borderRadius: 10 },
   pinImageQC: { width: 14, height: 14, resizeMode: 'contain' },
 
-  mapToggle: { position: 'absolute', bottom: 24, right: 16 },
+  pinMobile: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#34C759',
+    borderRadius: 22,
+    transform: [{ rotate: '45deg' }],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    elevation: 6,
+  },
+
+  mapToggle: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+  },
   mapToggleButton: {
     width: 64,
     height: 64,
@@ -450,5 +626,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  mapToggleImage: { width: '100%', height: '100%' },
+  mapToggleImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  /* 🗂️ LEGEND STYLES */
+  legend: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E7E7EA',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  legendDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 8,
+  },
+  legendDotBlue: { backgroundColor: '#007AFF' },
+  legendDotGreen: { backgroundColor: '#34C759' },
+  legendText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
 });

@@ -70,6 +70,7 @@ export default function FlowMapScreen() {
   /* ✅ Prevent UI overlay taps from also clearing MapView selection */
   const ignoreNextMapPressRef = useRef(false);
   const mapRef = useRef<MapView>(null);
+  const activeLaunchRef = useRef<string | null>(null);
 
   /* ---------------- DATA LOADING ---------------- */
 
@@ -86,21 +87,31 @@ export default function FlowMapScreen() {
     setLoadingLaunches(false);
   };
 
-  const loadFlowsForLaunch = async (launchName: string) => {
-    setLoadingFlows(true);
+ const loadFlowsForLaunch = async (launchName: string) => {
+  setLoadingFlows(true);
 
-    const { data, error } = await supabase
-      .from('launch_flows_v2')
-      .select('*')
-      .eq('boat_launch', launchName.trim());
+  // Mark this request as the active one
+  activeLaunchRef.current = launchName;
 
-    if (error) {
-      console.error('loadFlows error:', error);
-    }
+  const { data, error } = await supabase
+    .from('launch_flows_v2')
+    .select('*')
+    .eq('boat_launch', launchName.trim());
 
+  // ❌ Ignore stale responses (older searches finishing late)
+  if (activeLaunchRef.current !== launchName) {
+    return;
+  }
+
+  if (error) {
+    console.error('loadFlows error:', error);
+    setRows([]);
+  } else {
     setRows((data as MovementRow[]) ?? []);
-    setLoadingFlows(false);
-  };
+  }
+
+  setLoadingFlows(false);
+};
 
   useFocusEffect(
     useCallback(() => {
@@ -127,9 +138,10 @@ export default function FlowMapScreen() {
     setLaunchSearch('');
 
     ignoreNextMapPressRef.current = true;
-    setSelectedLaunch(launch);
-    setSelectedFlow(null);
-    loadFlowsForLaunch(launch.Name);
+   setSelectedLaunch(launch);
+setSelectedFlow(null);
+setRows([]);
+loadFlowsForLaunch(launch.Name);
 
     mapRef.current?.animateToRegion(
       {
@@ -295,23 +307,25 @@ export default function FlowMapScreen() {
         }}
       >
         {!selectedLaunch &&
-          launches.map(l => (
-            <Marker
-              key={l.id}
-              coordinate={{
-                latitude: l.Latitude,
-                longitude: l.Longitude,
-              }}
-              pinColor="red"
-              title={l.Name}
-              onPress={e => {
-                e.stopPropagation();
-                setSelectedLaunch(l);
-                setSelectedFlow(null);
-                loadFlowsForLaunch(l.Name);
-              }}
-            />
-          ))}
+  launches.map(l => (
+    <Marker
+      key={l.id}
+      coordinate={{
+        latitude: l.Latitude,
+        longitude: l.Longitude,
+      }}
+      pinColor="red"
+      title={l.Name}
+      onPress={e => {
+        e.stopPropagation();
+
+        setSelectedLaunch(l);
+        setSelectedFlow(null);
+        setRows([]); // ✅ clear old flows immediately
+        loadFlowsForLaunch(l.Name);
+      }}
+    />
+  ))}
 
         {selectedLaunch && (
           <Marker
