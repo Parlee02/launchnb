@@ -14,6 +14,12 @@ import {
 } from 'react-native';
 import MapView, { Callout, Circle, Marker } from 'react-native-maps';
 
+/* ---------------- PRELOADED IMAGES ---------------- */
+
+const DECON_ICON = require('@/assets/decon.png');
+const SAT_ICON = require('@/assets/imagesat.png');
+const DEF_ICON = require('@/assets/imagedef.png');
+
 /* ---------------- TYPES ---------------- */
 
 type DeconStation = {
@@ -28,7 +34,6 @@ type DeconStation = {
 
 type MobileDeconStation = {
   id: string;
-  organization: string | null;
   station_name: string;
   latitude: number;
   longitude: number;
@@ -36,6 +41,7 @@ type MobileDeconStation = {
   end_time: string;
   notes: string | null;
 };
+
 
 type Province = 'NB' | 'QC';
 
@@ -68,9 +74,7 @@ export default function DeconMapScreen() {
   }, []);
 
   const fetchStations = async () => {
-    const { data, error } = await supabase
-      .from('decon_stations')
-      .select('*');
+    const { data, error } = await supabase.from('decon_stations').select('*');
 
     if (error) {
       console.error(error.message);
@@ -100,8 +104,6 @@ export default function DeconMapScreen() {
   };
 
   /* ---------------- STATION FILTERING ---------------- */
-
-  const mapStations = useMemo(() => stations, [stations]);
 
   const searchableStations = useMemo(() => {
     return stations.filter(s => {
@@ -207,9 +209,7 @@ export default function DeconMapScreen() {
                 style={styles.dropdownItem}
                 onPress={() => selectStation(s)}
               >
-                <Text style={styles.dropdownText}>
-                  {s.station_name}
-                </Text>
+                <Text style={styles.dropdownText}>{s.station_name}</Text>
               </Pressable>
             ))}
           </View>
@@ -261,27 +261,36 @@ export default function DeconMapScreen() {
           Keyboard.dismiss();
         }}
       >
-        {/* PERMANENT STATIONS */}
-        {mapStations.map(station => {
-          const isQC = station.station_id.startsWith('STA');
-          const visible = province === 'NB' ? !isQC : isQC;
+        {/* PERMANENT STATIONS (CONDITIONALLY RENDERED) */}
+       {stations.map(station => {
+  const isQC = station.station_id.startsWith('STA');
+  const isMobile = station.station_type?.toLowerCase() === 'mobile';
+
+  const visible = province === 'NB' ? !isQC : isQC;
+  if (!visible) return null;
+
 
           return (
-            <View
-              key={station.station_id}
-              pointerEvents={visible ? 'auto' : 'none'}
-              style={{ opacity: visible ? 1 : 0 }}
-            >
+            <View key={station.station_id}>
               <Circle
-                center={{
-                  latitude: station.latitude,
-                  longitude: station.longitude,
-                }}
-                radius={DECON_RADIUS_METERS}
-                strokeColor="rgba(0,122,255,0.6)"
-                fillColor="rgba(0,122,255,0.18)"
-                strokeWidth={2}
-              />
+  center={{
+    latitude: station.latitude,
+    longitude: station.longitude,
+  }}
+  radius={DECON_RADIUS_METERS}
+  strokeColor={
+    isMobile
+      ? 'rgba(52,199,89,0.6)'   // 🟢 mobile
+      : 'rgba(0,122,255,0.6)'  // 🔵 permanent
+  }
+  fillColor={
+    isMobile
+      ? 'rgba(52,199,89,0.18)'
+      : 'rgba(0,122,255,0.18)'
+  }
+  strokeWidth={2}
+/>
+
 
               <Marker
                 coordinate={{
@@ -289,45 +298,45 @@ export default function DeconMapScreen() {
                   longitude: station.longitude,
                 }}
                 anchor={{ x: 0.5, y: 1 }}
+                tracksViewChanges={false}
               >
-                <View style={[styles.pin, isQC && styles.pinQC]}>
-                  <View
-                    style={[
-                      styles.pinInner,
-                      isQC && styles.pinInnerQC,
-                    ]}
-                  >
-                    <Image
-                      source={require('@/assets/decon.png')}
-                      style={[
-                        styles.pinImage,
-                        isQC && styles.pinImageQC,
-                      ]}
-                    />
-                  </View>
-                </View>
+             <View
+  style={[
+    isMobile ? styles.pinMobile : styles.pin,
+    isQC && styles.pinQC,
+  ]}
+  shouldRasterizeIOS
+  renderToHardwareTextureAndroid
+>
 
+  <View
+    style={[
+      styles.pinInner,
+      isQC && styles.pinInnerQC,
+    ]}
+  >
+    <Image
+  source={DECON_ICON}
+  style={[
+    styles.pinImage,
+    isQC && styles.pinImageQC,
+  ]}
+  fadeDuration={0}
+/>
+  </View>
+</View>
                 <Callout
-                  onPress={() =>
-                    openDirections(
-                      station.latitude,
-                      station.longitude
-                    )
-                  }
+                  onPress={() => openDirections(station.latitude, station.longitude)}
                 >
                   <View style={{ width: 220 }}>
-                    <Text style={{ fontWeight: '600' }}>
-                      {station.station_name}
-                    </Text>
+                    <Text style={{ fontWeight: '600' }}>{station.station_name}</Text>
 
                     {station.location_name &&
-                      station.location_name !==
-                        station.station_name && (
+                      station.location_name !== station.station_name && (
                         <Text>{station.location_name}</Text>
                       )}
 
-                    <Text>Type: {station.station_type}</Text>
-                    <Text>Status: {station.operational_status}</Text>
+                    {!isQC && <Text>Status: {station.operational_status}</Text>}
 
                     <Text
                       style={{
@@ -345,109 +354,89 @@ export default function DeconMapScreen() {
           );
         })}
 
-        {/* 🟢 MOBILE STATIONS */}
-        {mobileStations.map(station => {
-          const visible = province === 'NB';
+        {/* 🟢 MOBILE STATIONS (ONLY SHOW IN NB, CONDITIONALLY RENDERED) */}
+        {province === 'NB' &&
+          mobileStations.map(station => {
+            return (
+              <View key={station.id}>
+                <Circle
+                  center={{
+                    latitude: station.latitude,
+                    longitude: station.longitude,
+                  }}
+                  radius={DECON_RADIUS_METERS}
+                  strokeColor="rgba(52,199,89,0.6)"
+                  fillColor="rgba(52,199,89,0.18)"
+                  strokeWidth={2}
+                />
 
-          return (
-            <View
-              key={station.id}
-              pointerEvents={visible ? 'auto' : 'none'}
-              style={{ opacity: visible ? 1 : 0 }}
-            >
-              <Circle
-                center={{
-                  latitude: station.latitude,
-                  longitude: station.longitude,
-                }}
-                radius={DECON_RADIUS_METERS}
-                strokeColor="rgba(52,199,89,0.6)"
-                fillColor="rgba(52,199,89,0.18)"
-                strokeWidth={2}
-              />
-
-              <Marker
-                coordinate={{
-                  latitude: station.latitude,
-                  longitude: station.longitude,
-                }}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <View style={styles.pinMobile}>
-                  <View style={styles.pinInner}>
-                    <Image
-                      source={require('@/assets/decon.png')}
-                      style={styles.pinImage}
-                    />
-                  </View>
-                </View>
-
-                <Callout
-                  onPress={() =>
-                    openDirections(
-                      station.latitude,
-                      station.longitude
-                    )
-                  }
+                <Marker
+                  coordinate={{
+                    latitude: station.latitude,
+                    longitude: station.longitude,
+                  }}
+                  anchor={{ x: 0.5, y: 1 }}
+                  tracksViewChanges={false}
                 >
-                  <View style={{ width: 220 }}>
-                    <Text style={{ fontWeight: '600' }}>
-                      {station.station_name}
-                    </Text>
-
-                    {station.organization && (
-                      <Text>{station.organization}</Text>
-                    )}
-
-                    <Text>
-                      {new Date(
-                        station.start_time
-                      ).toLocaleString()}{' '}
-                      –{' '}
-                      {new Date(
-                        station.end_time
-                      ).toLocaleTimeString()}
-                    </Text>
-
-                    {station.notes && (
-                      <Text>{station.notes}</Text>
-                    )}
-
-                    <Text
-                      style={{
-                        marginTop: 8,
-                        color: '#007aff',
-                        fontWeight: '600',
-                      }}
+                  <View
+                    style={styles.pinMobile}
+                    shouldRasterizeIOS
+                    renderToHardwareTextureAndroid
+                  >
+                    <View
+                      style={styles.pinInner}
+                      shouldRasterizeIOS
+                      renderToHardwareTextureAndroid
                     >
-                      Directions →
-                    </Text>
+                      <Image
+                        source={DECON_ICON}
+                        style={styles.pinImage}
+                        fadeDuration={0}
+                      />
+                    </View>
                   </View>
-                </Callout>
-              </Marker>
-            </View>
-          );
-        })}
+
+                  <Callout
+                    onPress={() => openDirections(station.latitude, station.longitude)}
+                  >
+                    <View style={{ width: 220 }}>
+                      <Text style={{ fontWeight: '600' }}>{station.station_name}</Text>
+
+
+                      <Text>
+                        {new Date(station.start_time).toLocaleString()} –{' '}
+                        {new Date(station.end_time).toLocaleTimeString()}
+                      </Text>
+
+                      {station.notes && <Text>{station.notes}</Text>}
+
+                      <Text
+                        style={{
+                          marginTop: 8,
+                          color: '#007aff',
+                          fontWeight: '600',
+                        }}
+                      >
+                        Directions →
+                      </Text>
+                    </View>
+                  </Callout>
+                </Marker>
+              </View>
+            );
+          })}
       </MapView>
 
       {/* 🗂️ LEGEND */}
-      <View style={styles.legend}>
+      <View style={styles.legend} pointerEvents="none">
         <View style={styles.legendRow}>
-          <View
-            style={[styles.legendDot, styles.legendDotBlue]}
-          />
-          <Text style={styles.legendText}>
-            Permanent decon station
-          </Text>
+          <View style={[styles.legendDot, styles.legendDotBlue]} />
+          <Text style={styles.legendText}>Permanent decon station</Text>
         </View>
 
         <View style={styles.legendRow}>
-          <View
-            style={[styles.legendDot, styles.legendDotGreen]}
-          />
-          <Text style={styles.legendText}>
-            Mobile / temporary station
-          </Text>
+          <View style={[styles.legendDot, styles.legendDotGreen]} />
+          <Text style={styles.legendText}>Mobile decon station</Text>
         </View>
       </View>
 
@@ -455,21 +444,14 @@ export default function DeconMapScreen() {
       <View style={styles.mapToggle}>
         <Pressable
           onPress={() =>
-            setMapType(prev =>
-              prev === 'standard'
-                ? 'satellite'
-                : 'standard'
-            )
+            setMapType(prev => (prev === 'standard' ? 'satellite' : 'standard'))
           }
           style={styles.mapToggleButton}
         >
           <Image
-            source={
-              mapType === 'standard'
-                ? require('@/assets/imagesat.png')
-                : require('@/assets/imagedef.png')
-            }
+            source={mapType === 'standard' ? SAT_ICON : DEF_ICON}
             style={styles.mapToggleImage}
+            fadeDuration={0}
           />
         </Pressable>
       </View>

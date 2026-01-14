@@ -129,16 +129,20 @@ export default function FlowMapScreen() {
   }, [launches, launchSearch]);
 
   const topLaunchMatches = filteredLaunches.slice(0, 8);
+const selectLaunchFromSearch = (launch: Launch) => {
+  Keyboard.dismiss();
+  setShowLaunchDropdown(false);
+  setLaunchSearch('');
 
-  const selectLaunchFromSearch = (launch: Launch) => {
-    Keyboard.dismiss();
-    setShowLaunchDropdown(false);
-    setLaunchSearch('');
+  ignoreNextMapPressRef.current = true;
 
-    ignoreNextMapPressRef.current = true;
+  // 🔑 FORCE OLD MARKER TO UNMOUNT
+  setSelectedLaunch(null);
+  setSelectedFlow(null);
+  setRows([]);
+
+  requestAnimationFrame(() => {
     setSelectedLaunch(launch);
-    setSelectedFlow(null);
-    setRows([]);
     loadFlowsForLaunch(launch.Name);
 
     mapRef.current?.animateToRegion(
@@ -150,7 +154,9 @@ export default function FlowMapScreen() {
       },
       350
     );
-  };
+  });
+};
+
 
   /* ---------------- FLOW PROCESSING ---------------- */
 
@@ -310,14 +316,19 @@ export default function FlowMapScreen() {
               }}
               pinColor="red"
               title={l.Name}
-              onPress={e => {
-                e.stopPropagation();
+             onPress={e => {
+  e.stopPropagation();
 
-                setSelectedLaunch(l);
-                setSelectedFlow(null);
-                setRows([]); // ✅ clear old flows immediately
-                loadFlowsForLaunch(l.Name);
-              }}
+  // 🔑 FORCE OLD MARKER TO UNMOUNT
+  setSelectedLaunch(null);
+  setSelectedFlow(null);
+  setRows([]);
+
+  requestAnimationFrame(() => {
+    setSelectedLaunch(l);
+    loadFlowsForLaunch(l.Name);
+  });
+}}
             />
           ))}
 

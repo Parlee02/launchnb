@@ -1,10 +1,10 @@
 import {
+  Linking,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Linking,
-  Pressable,
 } from 'react-native';
 
 /* ---------------- COLORS ---------------- */
@@ -37,52 +37,43 @@ export default function CleanDrainDryScreen() {
         Aquatic invasive species can threaten biodiversity, ecosystem health, and
         economic activities. These species may spread unintentionally through
         recreational boating when organisms attach to watercraft, trailers, or
-        or equipment.
+        equipment.
       </Text>
 
       <Text style={styles.section}>
-        Under federal and provincial regulations, it is illegal to introduce
-        aquatic species into waters where they are not native, and illegal to
-        possess, transport, or release certain regulated species such as Zebra
-        and Quagga Mussels.
+        Clean • Drain • Dry is a widely recognized best-practice approach used
+        across Canada and North America to help reduce the spread of aquatic
+        invasive species. LaunchNB promotes these actions for educational and
+        awareness purposes only.
       </Text>
 
       {/* Steps */}
       <Text style={styles.header}>Prevention Steps</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>🧽 Clean</Text>
+        <Text style={styles.cardTitle}>Clean</Text>
         <Text style={styles.cardText}>
           Remove all visible plants, animals, mud, and debris. Clean watercraft,
           trailers, and equipment on dry land, away from storm drains and
-          waterways.
+          waterways where possible.
         </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>💧 Drain</Text>
+        <Text style={styles.cardTitle}>Drain</Text>
         <Text style={styles.cardText}>
           Drain all water from bilges, livewells, motors, bait buckets, coolers,
-          and internal compartments. Follow applicable provincial or local
-          requirements related to drain plugs.
+          and internal compartments. Drain plug requirements may vary by
+          jurisdiction.
         </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>☀️ Dry</Text>
+        <Text style={styles.cardTitle}>Dry</Text>
         <Text style={styles.cardText}>
           Allow all equipment to dry completely before entering another
-          waterbody. Drying time may vary depending on conditions and
-          jurisdictional guidance.
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🚿 Decontaminate</Text>
-        <Text style={styles.cardText}>
-          Decontamination is performed only after cleaning, draining, and drying.
-          This may involve high-temperature water or specialized equipment at
-          authorized stations. Extended air drying can also reduce risk.
+          waterbody. Drying time may vary depending on conditions and local
+          guidance.
         </Text>
       </View>
 
@@ -90,9 +81,8 @@ export default function CleanDrainDryScreen() {
       <Text style={styles.header}>About LaunchNB</Text>
 
       <Text style={styles.section}>
-        LaunchNB is an independent, voluntary tool designed to support awareness
-        of aquatic invasive species prevention. The app may include information
-        and visualizations intended for education, outreach, and analysis.
+        LaunchNB is an independent, non-government informational tool designed to
+        support planning and awareness of aquatic invasive species prevention.
       </Text>
 
       {/* Button */}
@@ -102,11 +92,14 @@ export default function CleanDrainDryScreen() {
 
       {/* Disclaimer */}
       <Text style={styles.disclaimer}>
-        This application is an independent informational tool and is not an
-        official government product. References to government organizations do
-        not imply endorsement or approval. Information is provided for awareness
-        purposes only and should not be used for enforcement or compliance
-        decisions.
+        LaunchNB provides publicly available and partner-supplied information for
+        planning and awareness purposes only. Availability, access conditions,
+        and operational status may change without notice. LaunchNB does not own,
+        operate, maintain, or staff any boat launch or decontamination station
+        shown in the app and does not guarantee accuracy or availability. Users
+        are responsible for assessing site conditions, personal safety, and
+        compliance with applicable laws and regulations. LaunchNB is not an
+        enforcement or regulatory authority.
       </Text>
     </ScrollView>
   );
@@ -116,11 +109,11 @@ export default function CleanDrainDryScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    paddingBottom: 44,
-    backgroundColor: '#F5F7FA',
-  },
-
+  paddingHorizontal: 22,
+  paddingTop: 20,
+  paddingBottom: 44,
+  backgroundColor: '#F5F7FA',
+},
   /* Hero */
   hero: {
     backgroundColor: IOS_BLUE_TINT,
@@ -154,6 +147,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 14,
     color: '#333',
+    textAlign: 'left',
   },
 
   /* Cards */
