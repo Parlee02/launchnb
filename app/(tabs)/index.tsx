@@ -418,11 +418,26 @@ const [nextWaterbody, setNextWaterbody] = useState<any | null>(null);
 
       {/* MODAL */}
       <Modal visible={!!selectedLaunch} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <SafeAreaView style={styles.modalSafe}>
-            <View style={styles.grabber} />
+        <View
+  style={[
+    styles.modalBackdrop,
+    { paddingBottom: view === 'checkin' ? 200 : 40 },
+  ]}
+>
+  <SafeAreaView
+  style={[
+    styles.modalSafe,
+    { maxHeight: view === 'checkin' ? '95%' : '70%' },
+  ]}
+>
+    <View style={styles.grabber} />
 
-            <ScrollView contentContainerStyle={styles.modal}>
+           <ScrollView
+  contentContainerStyle={[
+    styles.modal,
+    { paddingBottom: 32 },
+  ]}
+>
               {view === 'prompt' && (
                 <>
                   <Text style={styles.modalTitle}>{selectedLaunch?.Name}</Text>
@@ -849,10 +864,10 @@ const styles = StyleSheet.create({
   },
 
   modalBackdrop: {
-    flex: 1,
-    backgroundColor: '#00000055',
-    justifyContent: 'flex-end',
-  },
+  flex: 1,
+  backgroundColor: '#00000055',
+  justifyContent: 'flex-end',
+},
   modalSafe: { maxHeight: '90%' },
   grabber: {
     alignSelf: 'center',
