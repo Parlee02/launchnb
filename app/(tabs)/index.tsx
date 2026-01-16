@@ -605,41 +605,45 @@ const [nextWaterbody, setNextWaterbody] = useState<any | null>(null);
   /* 1️⃣ INSERT CHECK-IN */
 const { error: checkinError } = await supabase
   .from('launch_checkins')
-  .insert({
-    launch_id: selectedLaunch?.id ?? null,
-    launch_name: selectedLaunch?.Name ?? null,
+  .insert(
+    [
+      {
+        launch_id: selectedLaunch?.id ?? null,
+        launch_name: selectedLaunch?.Name ?? null,
 
-    prev_province: prevProvince ?? null,
-    prev_waterbody:
-      typeof prevWaterbody === 'string'
-        ? prevWaterbody
-        : prevWaterbody?.search_name ?? null,
-    prev_waterbody_id:
-      typeof prevWaterbody === 'object' &&
-      prevWaterbody?.id !== undefined &&
-      prevWaterbody?.id !== null
-        ? Number(prevWaterbody.id) // 🔑 IMPORTANT
-        : null,
+        prev_province: prevProvince ?? null,
+        prev_waterbody:
+          typeof prevWaterbody === 'string'
+            ? prevWaterbody
+            : prevWaterbody?.search_name ?? null,
+        prev_waterbody_id:
+          typeof prevWaterbody === 'object' &&
+          prevWaterbody?.id !== undefined &&
+          prevWaterbody?.id !== null
+            ? Number(prevWaterbody.id)
+            : null,
 
-    next_province: nextProvince ?? null,
-    next_waterbody:
-      typeof nextWaterbody === 'string'
-        ? nextWaterbody
-        : nextWaterbody?.search_name ?? null,
-    next_waterbody_id:
-      typeof nextWaterbody === 'object' &&
-      nextWaterbody?.id !== undefined &&
-      nextWaterbody?.id !== null
-        ? Number(nextWaterbody.id) // 🔑 IMPORTANT
-        : null,
-  });
+        next_province: nextProvince ?? null,
+        next_waterbody:
+          typeof nextWaterbody === 'string'
+            ? nextWaterbody
+            : nextWaterbody?.search_name ?? null,
+        next_waterbody_id:
+          typeof nextWaterbody === 'object' &&
+          nextWaterbody?.id !== undefined &&
+          nextWaterbody?.id !== null
+            ? Number(nextWaterbody.id)
+            : null,
+      },
+    ],
+    { returning: 'minimal' } as any
+  );
 
 if (checkinError) {
   console.error('CHECKIN INSERT ERROR:', checkinError);
   alert(checkinError.message);
   return;
 }
-
 
   /* 2️⃣ BUILD FLOW ROWS */
   const flowRows: any[] = [];
