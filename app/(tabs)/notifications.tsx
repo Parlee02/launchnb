@@ -6,7 +6,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import {
@@ -26,13 +25,13 @@ type NotificationRow = {
   title: string;
   body: string;
   created_at: string;
+  is_read: boolean;
 };
 
 /* ---------------- SCREEN ---------------- */
 
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const { refreshUnreadCount } = useContext(UnreadNotificationsContext);
@@ -52,8 +51,8 @@ export default function NotificationsScreen() {
     }
 
     const { data: notifData, error: notifError } = await supabase
-      .from('notifications')
-      .select('id, title, body, created_at')
+      .from('notifications_with_read')
+      .select('id, title, body, created_at, is_read')
       .order('created_at', { ascending: false });
 
     if (notifError || !notifData) {
@@ -64,25 +63,6 @@ export default function NotificationsScreen() {
     }
 
     setNotifications(notifData);
-
-    // If user is not logged in, skip read tracking
-    if (!user) {
-      console.warn('⚠️ no user — showing notifications read-only');
-      setLoading(false);
-      return;
-    }
-
-    const { data: readData, error: readError } = await supabase
-      .from('notification_reads')
-      .select('notification_id')
-      .eq('user_id', user.id);
-
-    if (readError) {
-      console.error('❌ failed to load read state:', readError);
-    }
-
-    setReadIds(new Set((readData ?? []).map(r => r.notification_id)));
-
     setLoading(false);
   }, []);
 
@@ -102,32 +82,33 @@ export default function NotificationsScreen() {
 
   /* ---------- UNREAD COUNT ---------- */
 
-  const unreadCount = useMemo(
-    () => notifications.filter(n => !readIds.has(n.id)).length,
-    [notifications, readIds]
-  );
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  /* ---------- MARK AS READ ---------- */
+  /* ---------- MARK AS READ (SMOOTH UX) ---------- */
 
   const markAsRead = useCallback(
     async (notificationId: string) => {
-      // Already read → no-op
-      if (readIds.has(notificationId)) return;
+      const alreadyRead = notifications.find(
+        n => n.id === notificationId
+      )?.is_read;
 
-      // Optimistic UI
-      setReadIds(prev => new Set(prev).add(notificationId));
+      if (alreadyRead) return;
+
+      // 🔥 Optimistic UI (instant, smooth)
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notificationId ? { ...n, is_read: true } : n
+        )
+      );
 
       const {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser();
 
-      if (authError || !user) {
-        console.warn('⚠️ not logged in — skipping DB write');
-        return;
-      }
+      if (authError || !user) return;
 
-      const { error } = await supabase
+      await supabase
         .from('notification_reads')
         .upsert(
           {
@@ -137,15 +118,10 @@ export default function NotificationsScreen() {
           { onConflict: 'notification_id,user_id' }
         );
 
-      if (error) {
-        console.error('❌ notification_reads upsert failed:', error);
-      } else {
-        console.log('✅ notification marked as read:', notificationId);
-      }
-
       refreshUnreadCount();
+      // No reload → avoids snap
     },
-    [readIds, refreshUnreadCount]
+    [notifications, refreshUnreadCount]
   );
 
   /* ---------- RENDER ---------- */
@@ -185,7 +161,7 @@ export default function NotificationsScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => {
-          const isRead = readIds.has(item.id);
+          const isRead = item.is_read;
 
           return (
             <Pressable

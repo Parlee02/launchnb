@@ -1,6 +1,6 @@
 import { supabase } from '@/supabaseClient';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -23,9 +23,11 @@ const OUTGOING_COLOR = 'rgba(0,122,255,0.85)';
 
 type Launch = {
   id: string;
-  Name: string;
-  Latitude: number;
-  Longitude: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  has_movement: boolean;
+  movement_count: number;
 };
 
 type MovementRow = {
@@ -74,50 +76,55 @@ export default function FlowMapScreen() {
 
   /* ---------------- DATA LOADING ---------------- */
 
-  const loadLaunches = async () => {
-    setLoadingLaunches(true);
+const loadLaunches = async () => {
+  setLoadingLaunches(true);
 
-    const { data, error } = await supabase.from('launches').select('*');
+  const { data, error } = await supabase
+  .from('launches_with_activity_real')
+    .select('*');
 
-    if (error) {
-      console.error('loadLaunches error:', error);
-    }
+  if (error) {
+    console.error('loadLaunches error:', error);
+  }
 
-    setLaunches(data ?? []);
-    setLoadingLaunches(false);
-  };
+  setLaunches(data ?? []);
+  setLoadingLaunches(false);
+};
 
-  const loadFlowsForLaunch = async (launchName: string) => {
-    setLoadingFlows(true);
+const loadFlowsForLaunch = async (launchName: string) => {
+  setLoadingFlows(true);
+  activeLaunchRef.current = launchName;
 
-    // Mark this request as the active one
-    activeLaunchRef.current = launchName;
+  const { data, error } = await supabase
+    .from('launch_flows_v2')
+    .select('*')
+    .eq('boat_launch', launchName.trim());
 
-    const { data, error } = await supabase
-      .from('launch_flows_v2')
-      .select('*')
-      .eq('boat_launch', launchName.trim());
+  if (activeLaunchRef.current !== launchName) return;
 
-    // ❌ Ignore stale responses (older searches finishing late)
-    if (activeLaunchRef.current !== launchName) {
-      return;
-    }
+  if (error) {
+    console.error('loadFlows error:', error);
+    setRows([]);
+  } else {
+    setRows((data as MovementRow[]) ?? []);
+  }
 
-    if (error) {
-      console.error('loadFlows error:', error);
-      setRows([]);
-    } else {
-      setRows((data as MovementRow[]) ?? []);
-    }
+  setLoadingFlows(false);
+};
 
-    setLoadingFlows(false);
-  };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadLaunches();
-    }, [])
-  );
+useFocusEffect(
+  useCallback(() => {
+    loadLaunches();
+  }, [])
+);
+
+useEffect(() => {
+  if (!selectedLaunch) return;
+  const updated = launches.find(l => l.id === selectedLaunch.id);
+  if (updated) setSelectedLaunch(updated);
+}, [launches, selectedLaunch?.id]);
+
 
   /* ---------------- SEARCH LOGIC ---------------- */
 
@@ -125,7 +132,7 @@ export default function FlowMapScreen() {
     const q = launchSearch.trim().toLowerCase();
     if (!q) return [];
 
-    return launches.filter(l => l.Name.toLowerCase().includes(q));
+  return launches.filter(l => l.name.toLowerCase().includes(q));
   }, [launches, launchSearch]);
 
   const topLaunchMatches = filteredLaunches.slice(0, 8);
@@ -143,12 +150,13 @@ const selectLaunchFromSearch = (launch: Launch) => {
 
   requestAnimationFrame(() => {
     setSelectedLaunch(launch);
-    loadFlowsForLaunch(launch.Name);
+  loadFlowsForLaunch(launch.name);
+
 
     mapRef.current?.animateToRegion(
       {
-        latitude: launch.Latitude,
-        longitude: launch.Longitude,
+        latitude: launch.latitude,
+longitude: launch.longitude,
         latitudeDelta: 0.15,
         longitudeDelta: 0.15,
       },
@@ -267,7 +275,7 @@ const selectLaunchFromSearch = (launch: Launch) => {
                 style={styles.launchDropdownItem}
                 onPress={() => selectLaunchFromSearch(item)}
               >
-                <Text style={styles.launchDropdownText}>{item.Name}</Text>
+                <Text style={styles.launchDropdownText}>{item.name}</Text>
               </Pressable>
             ))}
           </View>
@@ -307,15 +315,15 @@ const selectLaunchFromSearch = (launch: Launch) => {
         }}
       >
         {!selectedLaunch &&
-          launches.map(l => (
-            <Marker
-              key={l.id}
-              coordinate={{
-                latitude: l.Latitude,
-                longitude: l.Longitude,
-              }}
-              pinColor="red"
-              title={l.Name}
+        launches.map(l => (
+  <Marker
+    key={l.id}
+    coordinate={{
+      latitude: l.latitude,
+      longitude: l.longitude,
+    }}
+    pinColor={l.has_movement ? '#FF3B30' : '#C7C7CC'}
+    title={l.name}
              onPress={e => {
   e.stopPropagation();
 
@@ -326,20 +334,20 @@ const selectLaunchFromSearch = (launch: Launch) => {
 
   requestAnimationFrame(() => {
     setSelectedLaunch(l);
-    loadFlowsForLaunch(l.Name);
+ loadFlowsForLaunch(l.name);
   });
 }}
             />
           ))}
 
         {selectedLaunch && (
-          <Marker
-            coordinate={{
-              latitude: selectedLaunch.Latitude,
-              longitude: selectedLaunch.Longitude,
-            }}
-            pinColor="red"
-            title={selectedLaunch.Name}
+  <Marker
+    coordinate={{
+      latitude: selectedLaunch.latitude,
+      longitude: selectedLaunch.longitude,
+    }}
+    pinColor={selectedLaunch.has_movement ? '#FF3B30' : '#C7C7CC'}
+    title={selectedLaunch.name}
             onPress={e => e.stopPropagation()}
           />
         )}
@@ -364,14 +372,14 @@ const selectLaunchFromSearch = (launch: Launch) => {
                       ? [
                           endPoint,
                           {
-                            latitude: selectedLaunch.Latitude,
-                            longitude: selectedLaunch.Longitude,
+                           latitude: selectedLaunch.latitude,
+longitude: selectedLaunch.longitude,
                           },
                         ]
                       : [
                           {
-                            latitude: selectedLaunch.Latitude,
-                            longitude: selectedLaunch.Longitude,
+                            latitude: selectedLaunch.latitude,
+longitude: selectedLaunch.longitude,
                           },
                           endPoint,
                         ]
@@ -404,6 +412,20 @@ const selectLaunchFromSearch = (launch: Launch) => {
             );
           })}
       </MapView>
+
+
+{/* 🗂️ MOVEMENT LEGEND */}
+<View style={styles.movementLegend} pointerEvents="none">
+  <View style={styles.movementLegendRow}>
+    <View style={[styles.movementLegendDot, styles.movementLegendDotRed]} />
+    <Text style={styles.movementLegendText}>Launch with movement</Text>
+  </View>
+
+  <View style={styles.movementLegendRow}>
+    <View style={[styles.movementLegendDot, styles.movementLegendDotGrey]} />
+    <Text style={styles.movementLegendText}>No recorded movement</Text>
+  </View>
+</View>
 
       {/* ⏳ FLOW LOADING PILL */}
       {loadingFlows && selectedLaunch && (
@@ -677,4 +699,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+movementLegend: {
+  position: 'absolute',
+  bottom: 24,
+  left: 16,
+  backgroundColor: '#fff',
+  borderRadius: 14,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  elevation: 6,
+  borderWidth: 1,
+  borderColor: '#E7E7EA',
+},
+movementLegendRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginVertical: 4,
+},
+movementLegendDot: {
+  width: 14,
+  height: 14,
+  borderRadius: 7,
+  marginRight: 8,
+},
+movementLegendDotRed: { backgroundColor: '#FF3B30' },
+movementLegendDotGrey: { backgroundColor: '#C7C7CC' },
+movementLegendText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#333',
+},
+
 });

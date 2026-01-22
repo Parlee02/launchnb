@@ -79,11 +79,27 @@ export default function CleanDrainDryScreen() {
 
       {/* About */}
       <Text style={styles.header}>About LaunchNB</Text>
-
-      <Text style={styles.section}>
-        LaunchNB is an independent, non-government informational tool designed to
-        support planning and awareness of aquatic invasive species prevention.
-      </Text>
+<Text style={styles.section}>
+  LaunchNB is an independent, non-government informational tool designed to
+  support planning and awareness of aquatic invasive species prevention. For
+  questions or feedback, contact us at{' '}
+  <Text
+    style={{ color: IOS_BLUE, fontWeight: '600' }}
+    onPress={async () => {
+      const url = 'mailto:infolaunchnb@gmail.com';
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        // Fallback: just copy or show
+        alert('Email: infolaunchnb@gmail.com');
+      }
+    }}
+  >
+    infolaunchnb@gmail.com
+  </Text>
+  .
+</Text>
 
       {/* Button */}
       <Pressable style={styles.button} onPress={openDFOLink}>
@@ -92,8 +108,7 @@ export default function CleanDrainDryScreen() {
 
       {/* Disclaimer */}
       <Text style={styles.disclaimer}>
-        LaunchNB provides publicly available and partner-supplied information for
-        planning and awareness purposes only. Availability, access conditions,
+        LaunchNB provides publicly available information for awareness purposes only. Availability, access conditions,
         and operational status may change without notice. LaunchNB does not own,
         operate, maintain, or staff any boat launch or decontamination station
         shown in the app and does not guarantee accuracy or availability. Users

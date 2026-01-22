@@ -22,6 +22,15 @@ import { onWaterbodySelected } from '../../lib/waterbodySelection';
 
 /* ---------------- TYPES ---------------- */
 
+type Event = {
+  event_id: string;
+  event_name: string;
+  start: string;
+  end: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
 type Launch = {
   id: string;
   Name: string;
@@ -101,12 +110,24 @@ function normalizeLaunchRow(row: any, index: number): Launch | null {
 
 /* ---------------- SCREEN ---------------- */
 
+type Layer = 'launches' | 'tournaments';
+
 export default function LaunchesScreen() {
+  const [layer, setLayer] = useState<Layer>('launches'); // ✅ HERE
   const [launches, setLaunches] = useState<Launch[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedLaunch, setSelectedLaunch] = useState<Launch | null>(null);
   const [view, setView] = useState<SheetView>('prompt');
+const [events, setEvents] = useState<Event[]>([]);
+const [eventGroup, setEventGroup] = useState<Event[]>([]);
+const [eventIndex, setEventIndex] = useState(0);
+
+const currentEvent = eventGroup[eventIndex];
+
+
+
+
 
   /* 🗺️ MAP TYPE */
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
@@ -167,6 +188,22 @@ const [nextWaterbody, setNextWaterbody] = useState<any | null>(null);
 
     load();
   }, []);
+
+useEffect(() => {
+  const loadEvents = async () => {
+    const { data, error } = await supabase.from('events').select('*');
+
+    if (error) {
+      console.log('events load error', error);
+      setEvents([]);
+      return;
+    }
+
+    setEvents(data ?? []);
+  };
+
+  loadEvents();
+}, []);
 
   /* ✅ LISTEN FOR MAP PICKER SELECTIONS */
   useEffect(() => {
@@ -303,6 +340,65 @@ const [nextWaterbody, setNextWaterbody] = useState<any | null>(null);
 
   return (
     <View style={{ flex: 1 }}>
+
+<Modal visible={eventGroup.length > 0} animationType="slide" transparent>
+  <View style={styles.modalBackdrop}>
+    <SafeAreaView style={styles.modalSafe}>
+      <View style={styles.grabber} />
+
+      <View style={styles.modal}>
+        <Text style={styles.modalTitle}>
+          {currentEvent?.event_name}
+        </Text>
+
+        <Text style={{ marginBottom: 16 }}>
+          {currentEvent?.start} → {currentEvent?.end}
+        </Text>
+
+        {/* NAV */}
+        {eventGroup.length > 1 && (
+          <View style={styles.eventNav}>
+            <Pressable
+              disabled={eventIndex === 0}
+              onPress={() => setEventIndex(i => i - 1)}
+            >
+              <Text style={[
+                styles.navArrow,
+                eventIndex === 0 && { opacity: 0.3 }
+              ]}>
+                ◀
+              </Text>
+            </Pressable>
+
+            <Text style={styles.navCounter}>
+              {eventIndex + 1} / {eventGroup.length}
+            </Text>
+
+            <Pressable
+              disabled={eventIndex === eventGroup.length - 1}
+              onPress={() => setEventIndex(i => i + 1)}
+            >
+              <Text style={[
+                styles.navArrow,
+                eventIndex === eventGroup.length - 1 && { opacity: 0.3 }
+              ]}>
+                ▶
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        <Pressable
+          style={styles.primaryButton}
+          onPress={() => setEventGroup([])}
+        >
+          <Text style={styles.primaryText}>Close</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  </View>
+</Modal>
+
       {/* 🔍 LAUNCH SEARCH BAR (OVERLAY) */}
       <View style={styles.launchSearchWrap}>
         <View style={styles.launchSearchRow}>
@@ -377,25 +473,89 @@ const [nextWaterbody, setNextWaterbody] = useState<any | null>(null);
           Keyboard.dismiss();
         }}
       >
-        {markers.map(l => (
-  <Marker
-    key={l.id}
-    coordinate={{ latitude: l.Latitude, longitude: l.Longitude }}
-    title={l.Name}
-    pinColor="red"   // 👈 ADD THIS
-    onPress={() => {
-      setSelectedLaunch(l);
-      setView('prompt');
-    }}
-  />
-))}
+ {/* LAUNCHES */}
+{layer === 'launches' &&
+  markers.map(l => (
+    <Marker
+      key={l.id}
+      coordinate={{ latitude: l.Latitude, longitude: l.Longitude }}
+      title={l.Name}
+      pinColor="red"
+      onPress={() => {
+        setSelectedLaunch(l);
+        setView('prompt');
+      }}
+    />
+  ))}
 
+{/* EVENTS */}
+{layer === 'tournaments' &&
+(Object.values(
+  events.reduce((acc, e) => {
+    if (!e.latitude || !e.longitude) return acc;
+    const key = `${e.latitude.toFixed(5)}-${e.longitude.toFixed(5)}`;
+    acc[key] = acc[key] || [];
+    acc[key].push(e);
+    return acc;
+  }, {} as Record<string, Event[]>)
+) as Event[][]).map((group, i) => {
+
+    const e = group[0];
+
+    return (
+      <Marker
+        key={`event-group-${i}`}
+        coordinate={{
+          latitude: e.latitude!,
+          longitude: e.longitude!,
+        }}
+        pinColor="blue"
+        onPress={() => {
+          setEventGroup(group);
+          setEventIndex(0);
+        }}
+      />
+    );
+  })}
       </MapView>
 
-      {/* ℹ️ FLOATING HINT */}
-      <View style={styles.floatingHint}>
-        <Text style={styles.hintText}>Tap a boat launch to register your visit</Text>
-      </View>
+     {/* 🗂️ LAYER TOGGLE */}
+<View style={styles.layerToggle}>
+  <Pressable
+    onPress={() => setLayer('launches')}
+    style={[
+      styles.layerBtn,
+      layer === 'launches' && styles.layerBtnActive,
+    ]}
+  >
+    <Text
+      style={[
+        styles.layerText,
+        layer === 'launches' && styles.layerTextActive,
+      ]}
+    >
+      Launches
+    </Text>
+  </Pressable>
+
+  <Pressable
+    onPress={() => setLayer('tournaments')}
+    style={[
+      styles.layerBtn,
+      layer === 'tournaments' && styles.layerBtnActive,
+    ]}
+  >
+    <Text
+      style={[
+        styles.layerText,
+        layer === 'tournaments' && styles.layerTextActive,
+      ]}
+    >
+      Events
+    </Text>
+  </Pressable>
+</View>
+
 
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
@@ -967,4 +1127,58 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+layerToggle: {
+  position: 'absolute',
+  top: 76,
+  left: 12,
+  right: 12,
+  flexDirection: 'row',
+  backgroundColor: '#fff',
+  borderRadius: 20,
+  padding: 4,
+  gap: 6,
+  elevation: 6,
+  borderWidth: 1,
+  borderColor: '#E7E7EA',
+  zIndex: 40,
+},
+layerBtn: {
+  flex: 1,
+  paddingVertical: 6,      // was 8
+  paddingHorizontal: 14,   // was 16
+  borderRadius: 16,       // optional: 18 → 16 looks tighter
+  backgroundColor: '#F2F2F7',
+  alignItems: 'center',
+},
+layerBtnActive: {
+  backgroundColor: '#007AFF',
+},
+
+layerText: {
+  fontWeight: '600',   // ✅ same as Incoming/Outgoing
+  fontSize: 14,        // ✅ explicit (matches default RN button feel)
+  color: '#333',
+},
+
+
+layerTextActive: {
+  color: '#fff',
+},
+eventNav: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 16,
+},
+navArrow: {
+  fontSize: 28,
+  fontWeight: '700',
+  color: '#007AFF',
+},
+navCounter: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#444',
+},
+
 });
