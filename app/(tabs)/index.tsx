@@ -5,8 +5,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Keyboard,
-  Modal,
+  Keyboard, Linking, Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -14,7 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { searchWaterbodies } from '../../lib/searchwaterbodies';
@@ -24,13 +23,19 @@ import { onWaterbodySelected } from '../../lib/waterbodySelection';
 
 type Event = {
   event_id: string;
+  organizer_id: string;   // ✅ ADD THIS
   event_name: string;
   start: string;
   end: string;
   latitude: number | null;
   longitude: number | null;
 };
-
+type Organizer = {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+};
 type Launch = {
   id: string;
   Name: string;
@@ -50,6 +55,14 @@ const PROVINCES = [
 ];
 
 /* ---------------- HELPERS ---------------- */
+function formatDate(dateStr?: string) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 function toNumber(v: any): number | null {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
@@ -59,6 +72,9 @@ function toNumber(v: any): number | null {
   }
   return null;
 }
+
+
+
 
 /**
  * Normalizes ANY Supabase row into Launch shape.
@@ -122,6 +138,8 @@ export default function LaunchesScreen() {
 const [events, setEvents] = useState<Event[]>([]);
 const [eventGroup, setEventGroup] = useState<Event[]>([]);
 const [eventIndex, setEventIndex] = useState(0);
+const [organizers, setOrganizers] = useState<Organizer[]>([]);
+const [activeOrganizerId, setActiveOrganizerId] = useState<string | null>(null);
 
 const currentEvent = eventGroup[eventIndex];
 
@@ -205,6 +223,21 @@ useEffect(() => {
   loadEvents();
 }, []);
 
+useEffect(() => {
+  const loadOrganizers = async () => {
+    const { data, error } = await supabase
+      .from('organizers')
+      .select('*')
+      .eq('active', true)
+      .order('name');
+
+    if (!error) setOrganizers(data ?? []);
+  };
+
+  loadOrganizers();
+}, []);
+
+
   /* ✅ LISTEN FOR MAP PICKER SELECTIONS */
   useEffect(() => {
   const unsub = onWaterbodySelected(({ target, waterbody }) => {
@@ -239,6 +272,15 @@ useEffect(() => {
     if (!launchSearch.trim()) return [];
     return filteredLaunches.slice(0, 8);
   }, [filteredLaunches, launchSearch]);
+
+  const filteredEvents = useMemo(() => {
+  if (layer !== 'tournaments') return [];
+  const q = launchSearch.trim().toLowerCase();
+  if (!q) return [];
+  return events.filter(e =>
+    e.event_name.toLowerCase().includes(q)
+  );
+}, [events, launchSearch, layer]);
 
   /* Search previous */
   useEffect(() => {
@@ -351,9 +393,31 @@ useEffect(() => {
           {currentEvent?.event_name}
         </Text>
 
-        <Text style={{ marginBottom: 16 }}>
-          {currentEvent?.start} → {currentEvent?.end}
-        </Text>
+      <Text style={styles.eventDate}>
+  {formatDate(currentEvent?.start)}
+  {currentEvent?.start !== currentEvent?.end &&
+    ` → ${formatDate(currentEvent?.end)}`}
+</Text>
+
+<Pressable
+  style={styles.eventButton}
+  onPress={() => {
+    const lat = currentEvent?.latitude;
+    const lon = currentEvent?.longitude;
+
+    if (!lat || !lon) return;
+
+    const url = Platform.select({
+      ios: `http://maps.apple.com/?daddr=${lat},${lon}`,
+      android: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`,
+    });
+
+    if (url) Linking.openURL(url);
+  }}
+>
+  <Text style={styles.primaryText}>Get directions</Text>
+</Pressable>
+
 
         {/* NAV */}
         {eventGroup.length > 1 && (
@@ -389,21 +453,25 @@ useEffect(() => {
         )}
 
         <Pressable
-          style={styles.primaryButton}
-          onPress={() => setEventGroup([])}
-        >
-          <Text style={styles.primaryText}>Close</Text>
+  style={styles.eventButtonSecondary}
+  onPress={() => setEventGroup([])}
+><Text style={styles.secondaryText}>Close</Text>
         </Pressable>
       </View>
     </SafeAreaView>
   </View>
 </Modal>
 
+
       {/* 🔍 LAUNCH SEARCH BAR (OVERLAY) */}
       <View style={styles.launchSearchWrap}>
         <View style={styles.launchSearchRow}>
           <TextInput
-            placeholder="Search boat launches…"
+          placeholder={
+  layer === 'launches'
+    ? 'Search boat launches…'
+    : 'Search events…'
+}
             value={launchSearch}
             onChangeText={t => {
               setLaunchSearch(t);
@@ -431,98 +499,244 @@ useEffect(() => {
           )}
         </View>
 
-        {/* Dropdown results */}
-        {showLaunchDropdown && topLaunchMatches.length > 0 && (
-          <View style={styles.launchDropdown}>
-            {topLaunchMatches.map(item => (
-              <Pressable
-                key={item.id}
-                style={styles.launchDropdownItem}
-                onPress={() => selectLaunchFromSearch(item)}
-              >
-                <Text style={styles.launchDropdownText}>{item.Name}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+       {/* Dropdown results – Launches */}
+{showLaunchDropdown &&
+  layer === 'launches' &&
+  topLaunchMatches.length > 0 && (
+    <View style={styles.launchDropdown}>
+      {topLaunchMatches.map(item => (
+        <Pressable
+          key={item.id}
+          style={styles.launchDropdownItem}
+          onPress={() => selectLaunchFromSearch(item)}
+        >
+          <Text style={styles.launchDropdownText}>
+            {item.Name}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  )}
 
-        {showLaunchDropdown &&
-          !!launchSearch.trim() &&
-          topLaunchMatches.length === 0 && (
-            <View style={styles.launchDropdown}>
-              <View style={styles.launchDropdownItem}>
-                <Text style={styles.launchDropdownMuted}>No matches</Text>
-              </View>
-            </View>
-          )}
+{/* Dropdown results – Events */}
+{showLaunchDropdown &&
+  layer === 'tournaments' &&
+  filteredEvents.length > 0 && (
+    <View style={styles.launchDropdown}>
+      {filteredEvents.slice(0, 8).map(ev => (
+        <Pressable
+          key={ev.event_id}
+          style={styles.launchDropdownItem}
+          onPress={() => {
+            // 1️⃣ Close search UI
+            setShowLaunchDropdown(false);
+            setLaunchSearch('');
+
+            // 2️⃣ FORCE event mode (this keeps the bar)
+            setLayer('tournaments');
+
+            // 3️⃣ Sync organizer sidebar
+            setActiveOrganizerId(ev.organizer_id)
+
+
+            // 4️⃣ Zoom map to event
+            mapRef.current?.animateToRegion(
+              {
+                latitude: ev.latitude!,
+                longitude: ev.longitude!,
+                latitudeDelta: 0.2,
+                longitudeDelta: 0.2,
+              },
+              350
+            );
+
+            // 5️⃣ Open event modal
+            setEventGroup([]);
+            requestAnimationFrame(() => {
+              const group = events.filter(
+                e =>
+                  e.organizer_id === ev.organizer_id &&
+                  e.latitude === ev.latitude &&
+                  e.longitude === ev.longitude
+              );
+
+              setEventGroup(group);
+              setEventIndex(
+                group.findIndex(
+                  e => e.event_id === ev.event_id
+                )
+              );
+            });
+          }}
+        >
+          <Text style={styles.launchDropdownText}>
+            {ev.event_name}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  )}
+
+{/* No matches */}
+{showLaunchDropdown &&
+  !!launchSearch.trim() &&
+  ((layer === 'launches' && topLaunchMatches.length === 0) ||
+   (layer === 'tournaments' && filteredEvents.length === 0)) && (
+    <View style={styles.launchDropdown}>
+      <View style={styles.launchDropdownItem}>
+        <Text style={styles.launchDropdownMuted}>
+          No matches
+        </Text>
       </View>
+    </View>
+  )}
+</View>
 
-      {/* 🗺️ MAP */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        mapType={mapType}
-        initialRegion={{
-          latitude: 46,
-          longitude: -66.8,
-          latitudeDelta: 3,
-          longitudeDelta: 3,
-        }}
+{/* 🗺️ MAP */}
+<MapView
+  ref={mapRef}
+  style={styles.map}
+  mapType={mapType}
+  initialRegion={{
+    latitude: 46,
+    longitude: -66.8,
+    latitudeDelta: 3,
+    longitudeDelta: 3,
+  }}
+onPress={() => {
+  setShowLaunchDropdown(false);
+  Keyboard.dismiss();
+}}
+>
+  {/* LAUNCHES */}
+  {layer === 'launches' &&
+    markers.map(l => (
+      <Marker
+        key={l.id}
+        coordinate={{ latitude: l.Latitude, longitude: l.Longitude }}
+        title={l.Name}
+        pinColor="red"
         onPress={() => {
-          setShowLaunchDropdown(false);
-          Keyboard.dismiss();
+          setSelectedLaunch(l);
+          setView('prompt');
         }}
-      >
- {/* LAUNCHES */}
-{layer === 'launches' &&
-  markers.map(l => (
-    <Marker
-      key={l.id}
-      coordinate={{ latitude: l.Latitude, longitude: l.Longitude }}
-      title={l.Name}
-      pinColor="red"
-      onPress={() => {
-        setSelectedLaunch(l);
-        setView('prompt');
-      }}
-    />
-  ))}
+      />
+    ))}
+
+  {/* EVENTS (only when selected) */}
+
+
 
 {/* EVENTS */}
 {layer === 'tournaments' &&
-(Object.values(
-  events.reduce((acc, e) => {
-    if (!e.latitude || !e.longitude) return acc;
-    const key = `${e.latitude.toFixed(5)}-${e.longitude.toFixed(5)}`;
-    acc[key] = acc[key] || [];
-    acc[key].push(e);
-    return acc;
-  }, {} as Record<string, Event[]>)
-) as Event[][]).map((group, i) => {
+  events
+    .filter(e => {
+      if (!e.latitude || !e.longitude) return false;
+      if (!activeOrganizerId) return false;   // 👈 THIS IS THE KEY LINE
+      return e.organizer_id === activeOrganizerId;
+    })
+    .map(e => {
 
-    const e = group[0];
 
-    return (
-      <Marker
-        key={`event-group-${i}`}
-        coordinate={{
-          latitude: e.latitude!,
-          longitude: e.longitude!,
-        }}
-        pinColor="blue"
-        onPress={() => {
-          setEventGroup(group);
-          setEventIndex(0);
-        }}
-      />
-    );
-  })}
-      </MapView>
+      const isActive = e.organizer_id === activeOrganizerId;
 
-     {/* 🗂️ LAYER TOGGLE */}
+      return (
+        <Marker
+          key={e.event_id}
+          coordinate={{
+            latitude: e.latitude!,
+            longitude: e.longitude!,
+          }}
+          zIndex={isActive ? 9999 : 1}
+          onPress={() => {
+            setEventGroup([]);
+            requestAnimationFrame(() => {
+              const group = events.filter(
+                ev =>
+                  ev.organizer_id === e.organizer_id &&
+                  ev.latitude === e.latitude &&
+                  ev.longitude === e.longitude
+              );
+
+              setEventGroup(group);
+              setEventIndex(
+                group.findIndex(ev => ev.event_id === e.event_id)
+              );
+            });
+          }}
+        >
+          <View
+            style={[
+              styles.eventPin,
+            ]}
+          >
+            <Image
+              source={{
+                uri: organizers.find(o => o.id === e.organizer_id)?.logo_url!,
+              }}
+              style={styles.eventPinImage}
+            />
+          </View>
+        </Marker>
+      );
+    })}
+
+</MapView>
+
+{/* 🟦 EVENT SIDEBAR */}
+{layer === 'tournaments' && (
+  <View style={styles.eventRail}>
+    <FlatList
+      data={organizers}
+      keyExtractor={o => o.id}
+      showsVerticalScrollIndicator={false}
+      renderItem={({ item }) => {
+        const isActive = activeOrganizerId === item.id;
+
+        return (
+          <Pressable
+            style={styles.eventItem}
+           
+onPress={() => {
+  setActiveOrganizerId(item.id);
+}}
+          >
+            <View
+              style={[
+                styles.eventCircle,
+                isActive && styles.eventCircleActive,
+              ]}
+            >
+              {item.logo_url ? (
+                <Image
+                  source={{ uri: item.logo_url }}
+                  style={styles.eventLogo}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.eventPlaceholder}>
+                  {item.name.charAt(0)}
+                </Text>
+              )}
+            </View>
+
+            <Text style={styles.eventLabel}>
+              {item.name}
+            </Text>
+          </Pressable>
+        );
+      }}
+    />
+  </View>
+)}
+
+{/* 🗂️ LAYER TOGGLE */}
 <View style={styles.layerToggle}>
   <Pressable
-    onPress={() => setLayer('launches')}
+   onPress={() => {
+  setLayer('launches');
+  setActiveOrganizerId(null);
+}}
     style={[
       styles.layerBtn,
       layer === 'launches' && styles.layerBtnActive,
@@ -539,7 +753,10 @@ useEffect(() => {
   </Pressable>
 
   <Pressable
-    onPress={() => setLayer('tournaments')}
+    onPress={() => {
+      setLayer('tournaments');
+      setActiveOrganizerId(null);
+    }}
     style={[
       styles.layerBtn,
       layer === 'tournaments' && styles.layerBtnActive,
@@ -556,7 +773,6 @@ useEffect(() => {
   </Pressable>
 </View>
 
-
       {/* 🛰️ MAP TYPE TOGGLE */}
       <View style={styles.mapToggle}>
         <Pressable
@@ -565,14 +781,18 @@ useEffect(() => {
           }
           style={styles.mapToggleButton}
         >
-          <Image
-            source={
-              mapType === 'standard'
-                ? require('@/assets/imagesat.png')
-                : require('@/assets/imagedef.png')
-            }
-            style={styles.mapToggleImage}
-          />
+       <Image
+  source={
+    layer === 'tournaments'
+      ? mapType === 'standard'
+        ? require('@/assets/imagesat2.png')
+        : require('@/assets/imagedef2.png')
+      : mapType === 'standard'
+        ? require('@/assets/imagesat.png')
+        : require('@/assets/imagedef.png')
+  }
+  style={styles.mapToggleImage}
+/>
         </Pressable>
       </View>
 
@@ -602,16 +822,19 @@ useEffect(() => {
                 <>
                   <Text style={styles.modalTitle}>{selectedLaunch?.Name}</Text>
 
-                  <Pressable
-                    style={styles.primaryButton}
-                    onPress={() => setView('checkin')}
-                  >
-                    <Text style={styles.primaryText}>Check in at this launch</Text>
-                  </Pressable>
+                 <Pressable
+  style={styles.eventButton}
+  onPress={() => setView('checkin')}
+>
+  <Text style={styles.primaryText}>Check in at this launch</Text>
+</Pressable>
 
-                  <Pressable style={styles.cancel} onPress={closeAll}>
-                    <Text>Cancel</Text>
-                  </Pressable>
+            <Pressable
+  style={styles.eventButtonSecondary}
+  onPress={closeAll}
+>
+  <Text style={styles.secondaryText}>Close</Text>
+</Pressable>
                 </>
               )}
 
@@ -851,9 +1074,9 @@ if (checkinError) {
                     <Text style={styles.primaryText}>Submit check-in</Text>
                   </Pressable>
 
-                  <Pressable style={styles.cancel} onPress={closeAll}>
-                    <Text>Cancel</Text>
-                  </Pressable>
+                <Pressable style={styles.eventButtonSecondary} onPress={closeAll}>
+  <Text style={styles.secondaryText}>Close</Text>
+</Pressable>
                 </>
               )}
 
@@ -889,11 +1112,11 @@ if (checkinError) {
                   ))}
 
                   <Pressable
-                    style={styles.cancel}
-                    onPress={() => setView('checkin')}
-                  >
-                    <Text>Cancel</Text>
-                  </Pressable>
+  style={styles.eventButtonSecondary}
+  onPress={() => setView('checkin')}
+>
+  <Text style={styles.secondaryText}>Close</Text>
+</Pressable>
                 </>
               )}
             </ScrollView>
@@ -911,13 +1134,13 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   /* 🔍 Launch search */
-  launchSearchWrap: {
-    position: 'absolute',
-    top: 10,
-    left: 12,
-    right: 12,
-    zIndex: 50,
-  },
+ launchSearchWrap: {
+  position: 'absolute',
+  top: 10,
+  left: 12,
+  right: 12,
+  zIndex: 100,   // 👈 make this bigger than eventRail
+},
   launchSearchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1117,11 +1340,6 @@ const styles = StyleSheet.create({
   primaryText: { color: 'white', fontWeight: '800' },
   disabledButton: { opacity: 0.4 },
 
-  cancel: {
-    alignItems: 'center',
-    padding: 14,
-  },
-
   pickerItem: {
     paddingVertical: 16,
     borderBottomWidth: 1,
@@ -1179,6 +1397,113 @@ navCounter: {
   fontSize: 14,
   fontWeight: '600',
   color: '#444',
+},
+eventRail: {
+  position: 'absolute',
+  top: 140,
+  left: 8,
+  bottom: 40,
+  width: 86,
+  zIndex: 60,
+  alignItems: 'center',
+},
+
+eventItem: {
+  alignItems: 'center',
+  marginBottom: 14,
+},
+
+eventCircle: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: '#F2F2F7',
+  borderWidth: 2,
+  borderColor: '#007AFF',   // 🔵 always blue
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+},
+
+eventCircleActive: {
+  borderColor: '#007AFF',
+  backgroundColor: '#007AFF20',
+  shadowColor: '#007AFF',
+  shadowOpacity: 0.6,
+  shadowRadius: 6,
+  elevation: 6,
+},
+
+eventLogo: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+},
+
+eventPlaceholder: {
+  fontSize: 18,
+  fontWeight: '800',
+  color: '#444',
+},
+
+eventLabel: {
+  fontSize: 10,
+  fontWeight: '700',
+  marginTop: 4,
+  textAlign: 'center',
+  color: '#111',
+  maxWidth: 78,
+},
+eventPin: {
+  width: 26,
+  height: 26,
+  borderRadius: 13,
+  backgroundColor: '#fff',
+  borderWidth: 1,          // 👈 THIS IS THE KEY
+  borderColor: '#007AFF',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+eventPinActive: {
+  shadowColor: '#007AFF',
+  shadowOpacity: 0.7,
+  shadowRadius: 6,
+  elevation: 6,
+},
+
+eventPinImage: {
+  width: 18,
+  height: 18,
+  borderRadius: 9,
+},
+
+
+eventButton: {
+  backgroundColor: '#007AFF',
+  paddingVertical: 10,   // 👈 slimmer
+  paddingHorizontal: 14,
+  borderRadius: 14,
+  alignItems: 'center',
+  marginTop: 10,
+},
+
+eventButtonSecondary: {
+  backgroundColor: '#E9E9EE',
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14,
+  alignItems: 'center',
+  marginTop: 8,
+},
+secondaryText: {
+  color: '#111',
+  fontWeight: '700',
+},
+eventDate: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#444',
+  marginBottom: 16,
 },
 
 });
