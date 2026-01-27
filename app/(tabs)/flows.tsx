@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     right: 96,
     backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 18,
     borderRadius: 12,
     elevation: 8,
   },

@@ -1,3 +1,4 @@
+import { LegalDisclaimer } from '@/components/LegalDisclaimer';
 import {
   Linking,
   Pressable,
@@ -41,8 +42,7 @@ export default function CleanDrainDryScreen() {
       </Text>
 
       <Text style={styles.section}>
-        Clean • Drain • Dry is a widely recognized best-practice approach used
-        across Canada and North America to help reduce the spread of aquatic
+        Clean • Drain • Dry is a widely recognized best-practice approach used to help reduce the spread of aquatic
         invasive species. LaunchNB promotes these actions for educational and
         awareness purposes only.
       </Text>
@@ -77,45 +77,36 @@ export default function CleanDrainDryScreen() {
         </Text>
       </View>
 
-      {/* About */}
-      <Text style={styles.header}>About LaunchNB</Text>
-<Text style={styles.section}>
-  LaunchNB is an independent, non-government informational tool designed to
-  support planning and awareness of aquatic invasive species prevention. For
-  questions or feedback, contact us at{' '}
-  <Text
-    style={{ color: IOS_BLUE, fontWeight: '600' }}
-    onPress={async () => {
-      const url = 'mailto:infolaunchnb@gmail.com';
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        Linking.openURL(url);
-      } else {
-        // Fallback: just copy or show
-        alert('Email: infolaunchnb@gmail.com');
-      }
-    }}
-  >
-    infolaunchnb@gmail.com
-  </Text>
-  .
-</Text>
-
       {/* Button */}
       <Pressable style={styles.button} onPress={openDFOLink}>
-        <Text style={styles.buttonText}>Official Guidance (DFO)</Text>
+        <Text style={styles.buttonText}>DFO Guidance</Text>
       </Pressable>
 
-      {/* Disclaimer */}
-      <Text style={styles.disclaimer}>
-        LaunchNB provides publicly available information for awareness purposes only. Availability, access conditions,
-        and operational status may change without notice. LaunchNB does not own,
-        operate, maintain, or staff any boat launch or decontamination station
-        shown in the app and does not guarantee accuracy or availability. Users
-        are responsible for assessing site conditions, personal safety, and
-        compliance with applicable laws and regulations. LaunchNB is not an
-        enforcement or regulatory authority.
+      {/* About */}
+      <Text style={styles.header}>About LaunchNB</Text>
+      <Text style={styles.section}>
+        LaunchNB is an independent, non-government informational tool designed to
+        support planning and awareness of aquatic invasive species prevention.
+        For questions or feedback, contact us at{' '}
+        <Text
+          style={{ color: IOS_BLUE, fontWeight: '600' }}
+          onPress={async () => {
+            const url = 'mailto:info@launchnb.ca';
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+              Linking.openURL(url);
+            } else {
+              alert('Email: info@launchnb.ca');
+            }
+          }}
+        >
+          info@launchnb.ca
+        </Text>
+        .
       </Text>
+
+      {/* Legal */}
+      <LegalDisclaimer />
     </ScrollView>
   );
 }
@@ -124,11 +115,12 @@ export default function CleanDrainDryScreen() {
 
 const styles = StyleSheet.create({
   container: {
-  paddingHorizontal: 22,
-  paddingTop: 20,
-  paddingBottom: 44,
-  backgroundColor: '#F5F7FA',
-},
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 44,
+    backgroundColor: '#F5F7FA',
+  },
+
   /* Hero */
   hero: {
     backgroundColor: IOS_BLUE_TINT,
@@ -202,14 +194,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-
-  /* Disclaimer */
-  disclaimer: {
-    marginTop: 28,
-    fontSize: 12,
-    color: '#666',
-    lineHeight: 18,
-    textAlign: 'center',
   },
 });

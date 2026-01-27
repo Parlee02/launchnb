@@ -1,4 +1,6 @@
+import { ensureAnonymousUser } from '@/lib/ensureAnonymousUser';
 import { supabase } from '@/supabaseClient';
+import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -18,6 +20,8 @@ import {
 import MapView, { Marker } from 'react-native-maps';
 import { searchWaterbodies } from '../../lib/searchwaterbodies';
 import { onWaterbodySelected } from '../../lib/waterbodySelection';
+
+
 
 /* ---------------- TYPES ---------------- */
 
@@ -129,6 +133,14 @@ function normalizeLaunchRow(row: any, index: number): Launch | null {
 type Layer = 'launches' | 'tournaments';
 
 export default function LaunchesScreen() {
+
+
+useEffect(() => {
+  ensureAnonymousUser().catch(err => {
+    console.error('ensureAnonymousUser failed:', err);
+  });
+}, []);
+
   const [layer, setLayer] = useState<Layer>('launches'); // ✅ HERE
   const [launches, setLaunches] = useState<Launch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,7 +154,6 @@ const [organizers, setOrganizers] = useState<Organizer[]>([]);
 const [activeOrganizerId, setActiveOrganizerId] = useState<string | null>(null);
 
 const currentEvent = eventGroup[eventIndex];
-
 
 
 
@@ -527,47 +538,43 @@ useEffect(() => {
         <Pressable
           key={ev.event_id}
           style={styles.launchDropdownItem}
-          onPress={() => {
-            // 1️⃣ Close search UI
-            setShowLaunchDropdown(false);
-            setLaunchSearch('');
+     onPress={() => {
+  // 1️⃣ Close search UI
+  setShowLaunchDropdown(false);
+  setLaunchSearch('');
 
-            // 2️⃣ FORCE event mode (this keeps the bar)
-            setLayer('tournaments');
+  // 2️⃣ FORCE layer FIRST
+  setLayer('tournaments');
 
-            // 3️⃣ Sync organizer sidebar
-            setActiveOrganizerId(ev.organizer_id)
+  // 3️⃣ Next frame: set organizer + everything else
+  requestAnimationFrame(() => {
+    setActiveOrganizerId(ev.organizer_id);
 
+    // 4️⃣ Zoom map
+    mapRef.current?.animateToRegion(
+      {
+        latitude: ev.latitude!,
+        longitude: ev.longitude!,
+        latitudeDelta: 0.2,
+        longitudeDelta: 0.2,
+      },
+      350
+    );
 
-            // 4️⃣ Zoom map to event
-            mapRef.current?.animateToRegion(
-              {
-                latitude: ev.latitude!,
-                longitude: ev.longitude!,
-                latitudeDelta: 0.2,
-                longitudeDelta: 0.2,
-              },
-              350
-            );
+    // 5️⃣ Open modal
+    const group = events.filter(
+      e =>
+        e.organizer_id === ev.organizer_id &&
+        e.latitude === ev.latitude &&
+        e.longitude === ev.longitude
+    );
 
-            // 5️⃣ Open event modal
-            setEventGroup([]);
-            requestAnimationFrame(() => {
-              const group = events.filter(
-                e =>
-                  e.organizer_id === ev.organizer_id &&
-                  e.latitude === ev.latitude &&
-                  e.longitude === ev.longitude
-              );
-
-              setEventGroup(group);
-              setEventIndex(
-                group.findIndex(
-                  e => e.event_id === ev.event_id
-                )
-              );
-            });
-          }}
+    setEventGroup(group);
+    setEventIndex(
+      group.findIndex(e => e.event_id === ev.event_id)
+    );
+  });
+}}
         >
           <Text style={styles.launchDropdownText}>
             {ev.event_name}
@@ -625,20 +632,19 @@ onPress={() => {
 
   {/* EVENTS (only when selected) */}
 
-
-
 {/* EVENTS */}
 {layer === 'tournaments' &&
   events
     .filter(e => {
       if (!e.latitude || !e.longitude) return false;
-      if (!activeOrganizerId) return false;   // 👈 THIS IS THE KEY LINE
+      if (!activeOrganizerId) return false;
       return e.organizer_id === activeOrganizerId;
     })
     .map(e => {
 
-
-      const isActive = e.organizer_id === activeOrganizerId;
+      // JS scope
+      const logoUrl =
+        organizers.find(o => o.id === e.organizer_id)?.logo_url;
 
       return (
         <Marker
@@ -647,7 +653,7 @@ onPress={() => {
             latitude: e.latitude!,
             longitude: e.longitude!,
           }}
-          zIndex={isActive ? 9999 : 1}
+          zIndex={9999}
           onPress={() => {
             setEventGroup([]);
             requestAnimationFrame(() => {
@@ -659,30 +665,26 @@ onPress={() => {
               );
 
               setEventGroup(group);
-              setEventIndex(
-                group.findIndex(ev => ev.event_id === e.event_id)
-              );
+              setEventIndex(0);
             });
           }}
         >
-          <View
-            style={[
-              styles.eventPin,
-            ]}
-          >
-            <Image
-              source={{
-                uri: organizers.find(o => o.id === e.organizer_id)?.logo_url!,
-              }}
-              style={styles.eventPinImage}
-            />
+          <View style={styles.eventPin}>
+            {logoUrl && (
+              <ExpoImage
+                source={{ uri: logoUrl }}
+                style={styles.eventPinImage}
+                cachePolicy="disk"
+                priority="high"
+                transition={0}
+              />
+            )}
           </View>
         </Marker>
       );
     })}
 
 </MapView>
-
 {/* 🟦 EVENT SIDEBAR */}
 {layer === 'tournaments' && (
   <View style={styles.eventRail}>
@@ -708,11 +710,14 @@ onPress={() => {
               ]}
             >
               {item.logo_url ? (
-                <Image
-                  source={{ uri: item.logo_url }}
-                  style={styles.eventLogo}
-                  resizeMode="contain"
-                />
+              <ExpoImage
+  source={{ uri: item.logo_url }}
+  style={styles.eventLogo}
+  contentFit="contain"
+  cachePolicy="disk"
+  priority="high"
+  transition={0}
+/>
               ) : (
                 <Text style={styles.eventPlaceholder}>
                   {item.name.charAt(0)}
@@ -793,6 +798,7 @@ onPress={() => {
   }
   style={styles.mapToggleImage}
 />
+
         </Pressable>
       </View>
 
@@ -812,12 +818,14 @@ onPress={() => {
 >
     <View style={styles.grabber} />
 
-           <ScrollView
+      <ScrollView
+  keyboardShouldPersistTaps="handled"   // 👈 THIS IS THE MISSING PIECE
   contentContainerStyle={[
     styles.modal,
     { paddingBottom: 32 },
   ]}
 >
+
               {view === 'prompt' && (
                 <>
                   <Text style={styles.modalTitle}>{selectedLaunch?.Name}</Text>
@@ -840,35 +848,42 @@ onPress={() => {
 
               {view === 'checkin' && (
                 <>
-                  <Text style={styles.modalTitle}>Trip details</Text>
+                  <Text style={styles.modalTitle}>Register boater movement</Text>
 
                   {/* LAST TRIP */}
                   <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Last trip</Text>
+                    <Text style={styles.cardTitle}>Previous waterbody</Text>
 
                     <Pressable
-                      style={styles.selector}
-                      onPress={() => setView('province-prev')}
-                    >
-                      <Text style={styles.selectorLabel}>Province</Text>
-                      <Text style={styles.selectorValue}>{prevProvince}</Text>
-                    </Pressable>
-
-                    {prevWaterbody ? (
-                      <View style={styles.selectedRow}>
-                        <Text style={styles.selectedText}>
-  {prevWaterbody?.search_name}
+  style={styles.settingRow}
+  onPress={() => setView('province-prev')}
+>
+  <Text style={styles.settingLabel}>Province</Text>
+  <View style={styles.settingRight}>
+   <Text style={[styles.settingValue, styles.settingValueBlue]}>
+  {prevProvince}
 </Text>
-                        <Pressable
-                          onPress={() => {
-                            setPrevWaterbody(null);
-                            setPrevQuery('');
-                          }}
-                        >
-                          <Text style={styles.changeText}>Change</Text>
-                        </Pressable>
-                      </View>
-                    ) : (
+   <View>
+  <Text style={styles.chevron}>›</Text>
+</View>
+  </View>
+</Pressable>
+
+      {prevWaterbody ? (
+  <View style={styles.settingRow}>
+  <Text style={styles.settingValuePrimary}>
+    {prevWaterbody?.search_name}
+  </Text>
+
+  <Pressable onPress={() => {
+    setPrevWaterbody(null);
+    setPrevQuery('');
+  }}>
+    <Text style={styles.changeText}>Change</Text>
+  </Pressable>
+  </View>
+) : (
+
                       <>
                         <TextInput
                           placeholder="Search waterbody"
@@ -878,15 +893,18 @@ onPress={() => {
                           autoCorrect={false}
                           autoCapitalize="none"
                         />
-                        <FlatList
+                    <FlatList
   data={prevResults}
   scrollEnabled={false}
+  keyboardShouldPersistTaps="handled"
   keyExtractor={(item, i) => `prev-${i}`}
   renderItem={({ item }) => (
+
+
+    
     <Pressable
       style={styles.resultItem}
       onPress={() => {
-        // ✅ If duplicates, open map picker; else select directly
         if (Number(item?.name_count ?? 0) > 1) {
           setPrevResults([]);
           openWaterbodyPicker('prev', prevProvince, item);
@@ -907,35 +925,46 @@ onPress={() => {
 
                   {/* NEXT TRIP */}
                   <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Next planned trip</Text>
+                    <Text style={styles.cardTitle}>Next waterbody</Text>
 
-                    <Pressable
-                      style={styles.selector}
-                      onPress={() => setView('province-next')}
-                    >
-                      <Text style={styles.selectorLabel}>Province</Text>
-                      <Text style={styles.selectorValue}>{nextProvince}</Text>
-                    </Pressable>
+                   <Pressable
+  style={styles.settingRow}
+  onPress={() => setView('province-next')}
+>
+  <Text style={styles.settingLabel}>Province</Text>
+  <View style={styles.settingRight}>
+    <Text style={[styles.settingValue, styles.settingValueBlue]}>
+  {nextProvince}
+</Text>
+   <View>
+  <Text style={styles.chevron}>›</Text>
+</View>
+  </View>
+</Pressable>
+
 
                     {nextWaterbody ? (
-                      <View style={styles.selectedRow}>
-                        <Text style={styles.selectedText}>
-  {nextWaterbody?.search_name}
-</Text>
-                        <Pressable
-                          onPress={() => {
-                            setNextWaterbody(null);
-                            setNextQuery('');
-                          }}
-                        >
-                          <Text style={styles.changeText}>Change</Text>
-                        </Pressable>
-                      </View>
+        <View style={styles.settingRow}>
+  <Text style={styles.settingValuePrimary}>
+    {nextWaterbody?.search_name}
+  </Text>
+
+<Pressable onPress={() => {
+  setNextWaterbody(null);   // ✅ correct
+  setNextQuery('');
+}}>
+    <Text style={styles.changeText}>Change</Text>
+  </Pressable>
+</View>
                     ) : (
                       <>
                         <Pressable
                           style={styles.undecidedButton}
-                          onPress={() => setNextWaterbody("Haven’t decided yet")}
+                          onPress={() =>
+  setNextWaterbody({
+    search_name: "Haven’t decided yet",
+  })
+}
                         >
                           <Text style={styles.undecidedText}>Haven’t decided yet</Text>
                         </Pressable>
@@ -948,31 +977,28 @@ onPress={() => {
                           autoCorrect={false}
                           autoCapitalize="none"
                         />
-                        <FlatList
+                       <FlatList
   data={nextResults}
   scrollEnabled={false}
+  keyboardShouldPersistTaps="handled"
   keyExtractor={(item, i) => `next-${i}`}
-  renderItem={({ item }) => {
-    console.log('NEXT RESULT:', item);
-
-    return (
-      <Pressable
-        style={styles.resultItem}
-        onPress={() => {
-          if (Number(item?.name_count ?? 0) > 1) {
-            setNextResults([]);
-            openWaterbodyPicker('next', nextProvince, item);
-            return;
-          }
-
-          setNextWaterbody(item);
+  renderItem={({ item }) => (
+    <Pressable
+      style={styles.resultItem}
+      onPress={() => {
+        if (Number(item?.name_count ?? 0) > 1) {
           setNextResults([]);
-        }}
-      >
-        <Text>{item.search_name}</Text>
-      </Pressable>
-    );
-  }}
+          openWaterbodyPicker('next', nextProvince, item);
+          return;
+        }
+
+        setNextWaterbody(item);
+        setNextResults([]);
+      }}
+    >
+      <Text>{item.search_name}</Text>
+    </Pressable>
+  )}
 />
                       </>
                     )}
@@ -985,6 +1011,8 @@ onPress={() => {
                       !canSubmit && styles.disabledButton,
                     ]}
                     onPress={async () => {
+                      await ensureAnonymousUser();
+
   /* 1️⃣ INSERT CHECK-IN */
 const { error: checkinError } = await supabase
   .from('launch_checkins')
@@ -1273,16 +1301,16 @@ const styles = StyleSheet.create({
 
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
 
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
-  },
+ card: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: '#EFEFF4',
+},
+
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
 
   selector: {
@@ -1306,14 +1334,13 @@ const styles = StyleSheet.create({
   selectedText: { fontWeight: '700' },
   changeText: { color: '#007AFF', fontWeight: '700' },
 
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
-    backgroundColor: '#fff',
-  },
+input: {
+  backgroundColor: '#F2F2F7',
+  borderRadius: 12,
+  padding: 12,
+  marginTop: 8,
+  fontSize: 15,
+},
 
   resultItem: {
     paddingVertical: 10,
@@ -1505,5 +1532,48 @@ eventDate: {
   color: '#444',
   marginBottom: 16,
 },
+settingRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingVertical: 14,
+  borderBottomWidth: 1,
+  borderBottomColor: '#EFEFF4',
+},
 
+settingLabel: {
+  fontSize: 15,
+  color: '#111',
+  fontWeight: '600',
+},
+
+settingRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  flex: 1,
+  justifyContent: 'flex-end', // ✅ THIS
+},
+
+settingValue: {
+  fontSize: 15,
+  color: '#666',
+  fontWeight: '600',
+  maxWidth: '70%',      // 👈 IMPORTANT
+},
+
+settingValueBlue: {
+  color: '#007AFF',     // iOS blue
+},
+chevron: {
+  fontSize: 20,
+  color: '#C7C7CC', // iOS light grey
+  marginTop: -2,
+},
+settingValuePrimary: {
+  fontSize: 15,
+  color: '#111',
+  fontWeight: '600',
+  maxWidth: '70%',
+},
 });
