@@ -128,7 +128,7 @@ export default function NotificationsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={[]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" />
         </View>
@@ -137,18 +137,7 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {(unreadCount > 0 || notifications.length > 0) && (
-        <View style={styles.topBar}>
-          {unreadCount > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
-            </View>
-          ) : (
-            <View />
-          )}
-        </View>
-      )}
+   <SafeAreaView style={styles.container} edges={[]}>
 
       {!notifications.length && (
         <View style={styles.center}>

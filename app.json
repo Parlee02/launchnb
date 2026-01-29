@@ -8,19 +8,16 @@
     "scheme": "launchnb",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "extra": {
       "eas": {
         "projectId": "8fa52c02-735b-41d5-91c1-c86927462981"
       }
     },
-
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.parlee.launchnb",
@@ -29,7 +26,6 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
@@ -39,17 +35,15 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.parlee.launchnb"
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store"
     ],
-
     "experiments": {
       "typedRoutes": true
     }

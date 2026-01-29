@@ -71,5 +71,23 @@ export default function RootLayout() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  // 👇 THIS is the only real change
+  return (
+    <Stack>
+      {/* Bottom tabs */}
+      <Stack.Screen
+        name="(tabs)"
+        options={{ headerShown: false }}
+      />
+
+      {/* Global CDD screen */}
+      <Stack.Screen
+        name="clean-drain-dry"
+        options={{
+          title: 'Clean • Drain • Dry',
+          headerBackTitle: 'Back',
+        }}
+      />
+    </Stack>
+  );
 }

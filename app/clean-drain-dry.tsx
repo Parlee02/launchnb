@@ -86,7 +86,7 @@ export default function CleanDrainDryScreen() {
       <Text style={styles.header}>About LaunchNB</Text>
       <Text style={styles.section}>
         LaunchNB is an independent, non-government informational tool designed to
-        support planning and awareness of aquatic invasive species prevention.
+        support awareness of aquatic invasive species prevention.
         For questions or feedback, contact us at{' '}
         <Text
           style={{ color: IOS_BLUE, fontWeight: '600' }}
