@@ -152,6 +152,7 @@ const [eventGroup, setEventGroup] = useState<Event[]>([]);
 const [eventIndex, setEventIndex] = useState(0);
 const [organizers, setOrganizers] = useState<Organizer[]>([]);
 const [activeOrganizerId, setActiveOrganizerId] = useState<string | null>(null);
+const inputRef = useRef<TextInput>(null);
 
 const currentEvent = eventGroup[eventIndex];
 
@@ -495,19 +496,20 @@ useEffect(() => {
             returnKeyType="search"
             placeholderTextColor="#7A7A7A"
           />
+{!!launchSearch.trim() && (
+  <Pressable
+    onPress={() => {
+      setLaunchSearch('');          // 👈 THIS WAS MISSING
+      setShowLaunchDropdown(false);
+      Keyboard.dismiss();
+    }}
+    style={styles.clearBtn}
+    hitSlop={10}
+  >
+    <Text style={styles.clearBtnText}>×</Text>
+  </Pressable>
+)}
 
-          {!!launchSearch.trim() && (
-            <Pressable
-              onPress={() => {
-                setShowLaunchDropdown(false);
-                Keyboard.dismiss();
-              }}
-              style={styles.clearBtn}
-              hitSlop={10}
-            >
-              <Text style={styles.clearBtnText}>×</Text>
-            </Pressable>
-          )}
         </View>
 
        {/* Dropdown results – Launches */}

@@ -190,12 +190,14 @@ export default function TabLayout() {
 /* ---------- STYLES ---------- */
 
 const styles = StyleSheet.create({
- header: {
+header: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'space-between',
   width: '100%',
+  paddingHorizontal: 12, // 👈 this is the key
 },
+
 
   title: {
     fontSize: 18,
@@ -214,15 +216,17 @@ const styles = StyleSheet.create({
 },
 
 cddPill: {
-  backgroundColor: IOS_BLUE,
+  backgroundColor: '#F2F2F7', // iOS system gray 6
   paddingHorizontal: 10,
   paddingVertical: 4,
   borderRadius: 10,
+  borderWidth: 1,
+  borderColor: '#D1D1D6', // iOS system gray 4
 },
 
 cddText: {
-  color: 'white',
-  fontWeight: '700',
+  color: IOS_BLUE,
+  fontWeight: '600',
   fontSize: 13,
 },
 
