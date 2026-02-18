@@ -229,7 +229,7 @@ useEffect(() => {
       return;
     }
 
-    setEvents(data ?? []);
+    setEvents((data ?? []) as Event[]);
   };
 
   loadEvents();
@@ -248,6 +248,15 @@ useEffect(() => {
 
   loadOrganizers();
 }, []);
+
+useEffect(() => {
+  organizers.forEach(o => {
+    if (o.logo_url) {
+      ExpoImage.prefetch(o.logo_url);
+    }
+  });
+}, [organizers]);
+
 
 
   /* ✅ LISTEN FOR MAP PICKER SELECTIONS */
@@ -673,13 +682,14 @@ onPress={() => {
         >
           <View style={styles.eventPin}>
             {logoUrl && (
-              <ExpoImage
-                source={{ uri: logoUrl }}
-                style={styles.eventPinImage}
-                cachePolicy="disk"
-                priority="high"
-                transition={0}
-              />
+            <ExpoImage
+  source={{ uri: logoUrl }}
+  style={styles.eventPinImage}
+  contentFit="contain"
+  cachePolicy="disk"
+  transition={0}
+/>
+
             )}
           </View>
         </Marker>
@@ -712,12 +722,11 @@ onPress={() => {
               ]}
             >
               {item.logo_url ? (
-              <ExpoImage
+            <ExpoImage
   source={{ uri: item.logo_url }}
   style={styles.eventLogo}
   contentFit="contain"
   cachePolicy="disk"
-  priority="high"
   transition={0}
 />
               ) : (
@@ -775,7 +784,7 @@ onPress={() => {
         layer === 'tournaments' && styles.layerTextActive,
       ]}
     >
-      Events
+      Tournaments
     </Text>
   </Pressable>
 </View>
@@ -1015,7 +1024,7 @@ onPress={() => {
                     onPress={async () => {
                       await ensureAnonymousUser();
 
-  /* 1️⃣ INSERT CHECK-IN */
+/* 1️⃣ INSERT CHECK-IN */
 const { error: checkinError } = await supabase
   .from('launch_checkins')
   .insert(
@@ -1031,8 +1040,7 @@ const { error: checkinError } = await supabase
             : prevWaterbody?.search_name ?? null,
         prev_waterbody_id:
           typeof prevWaterbody === 'object' &&
-          prevWaterbody?.id !== undefined &&
-          prevWaterbody?.id !== null
+          prevWaterbody?.id != null
             ? Number(prevWaterbody.id)
             : null,
 
@@ -1043,13 +1051,11 @@ const { error: checkinError } = await supabase
             : nextWaterbody?.search_name ?? null,
         next_waterbody_id:
           typeof nextWaterbody === 'object' &&
-          nextWaterbody?.id !== undefined &&
-          nextWaterbody?.id !== null
+          nextWaterbody?.id != null
             ? Number(nextWaterbody.id)
             : null,
       },
-    ],
-    { returning: 'minimal' } as any
+    ] as any[]   // 👈 THIS is the missing piece
   );
 
 if (checkinError) {
@@ -1057,6 +1063,7 @@ if (checkinError) {
   alert(checkinError.message);
   return;
 }
+
 
   /* 2️⃣ BUILD FLOW ROWS */
   const flowRows: any[] = [];
@@ -1578,4 +1585,6 @@ settingValuePrimary: {
   fontWeight: '600',
   maxWidth: '70%',
 },
+
+
 });

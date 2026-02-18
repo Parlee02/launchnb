@@ -1,7 +1,5 @@
 import { supabase } from '@/supabaseClient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Buffer } from 'buffer';
-import * as FileSystem from 'expo-file-system/legacy';
 import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -76,12 +74,16 @@ const SHEET_ESTIMATED_HEIGHT = 340; // ✅ tune once if needed
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
- const [confirmedReports, setConfirmedReports] = useState<ConfirmedReport[]>([]);
+const [allConfirmedReports, setAllConfirmedReports] = useState<ConfirmedReport[]>([]);
+const [filteredReports, setFilteredReports] = useState<ConfirmedReport[]>([]);
   const [selectedReport, setSelectedReport] =
     useState<ConfirmedReport | null>(null);
 
 const [mapType, setMapType] =
   useState<'standard' | 'satellite'>('standard');
+
+const [mapKey, setMapKey] = useState(0);
+
 
   const SAT_ICON = require('@/assets/imagesat2.png');
 const DEF_ICON = require('@/assets/imagedef2.png');
@@ -108,6 +110,9 @@ async function loadSpecies() {
   }
 }
 
+
+
+
 /* ---------------- EFFECTS ---------------- */
 
 useEffect(() => {
@@ -115,14 +120,25 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  loadConfirmedReports(selectedSpecies);
+  loadConfirmedReports();
+}, []);
+
+useEffect(() => {
+  setMapKey(k => k + 1);
 }, [selectedSpecies]);
+
+useEffect(() => {
+  speciesList.forEach(sp => {
+    if (sp.image_url) {
+      ExpoImage.prefetch(sp.image_url);
+    }
+  });
+}, [speciesList]);
 
 /* ---------------- LOAD CONFIRMED REPORTS ---------------- */
 
-async function loadConfirmedReports(species: Species | null) {
-
-  let query = supabase
+async function loadConfirmedReports() {
+  const { data, error } = await supabase
     .from('ais_reports')
     .select(`
       id,
@@ -140,33 +156,80 @@ async function loadConfirmedReports(species: Species | null) {
     .eq('public_visible', true)
     .eq('status', 'confirmed');
 
-  if (species) {
-    query = query.eq('species_id', species.id);
-  }
-
-  const { data, error } = await query.returns<ConfirmedReport[]>();
   if (!error && data) {
-    setConfirmedReports(data);
+    setAllConfirmedReports(data as ConfirmedReport[]);
+    setFilteredReports(data as ConfirmedReport[]);
   }
 }
+
+
+
+
+useEffect(() => {
+  if (!selectedSpecies) {
+    setFilteredReports(allConfirmedReports);
+  } else {
+    setFilteredReports(
+      allConfirmedReports.filter(r => r.species?.id === selectedSpecies.id)
+    );
+  }
+}, [selectedSpecies, allConfirmedReports]);
+
+useEffect(() => {
+  allConfirmedReports.forEach(r => {
+    if (r.species?.image_url) {
+      ExpoImage.prefetch(r.species.image_url);
+    }
+  });
+}, [allConfirmedReports]);
 
 
   /* ---------------- TAKE PHOTO ---------------- */
 
   async function takePhoto() {
     const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!cameraPerm.granted) {
-      Alert.alert('Camera access required');
-      return;
-    }
+   if (!cameraPerm.granted) {
+  if (!cameraPerm.canAskAgain) {
+    Alert.alert(
+      'Camera access required',
+      'Please enable camera access in Settings to report.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Open Settings',
+          onPress: () => Linking.openSettings(),
+        },
+      ]
+    );
+  } else {
+    Alert.alert('Camera access required');
+  }
+  return;
+}
 
-    const locationPerm = await Location.requestForegroundPermissionsAsync();
-    if (!locationPerm.granted) {
-      Alert.alert('Location access required');
-      return;
-    }
+const locationPerm = await Location.requestForegroundPermissionsAsync();
 
-    const photo = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+if (!locationPerm.granted) {
+  if (!locationPerm.canAskAgain) {
+    Alert.alert(
+      'Location access required',
+      'Please enable location access in Settings to report observations.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Open Settings',
+          onPress: () => Linking.openSettings(),
+        },
+      ]
+    );
+  } else {
+    Alert.alert('Location access required');
+  }
+  return;
+}
+
+
+   const photo = await ImagePicker.launchCameraAsync({ quality: 0.5 });
     if (photo.canceled) return;
 
     const loc = await Location.getCurrentPositionAsync({});
@@ -214,16 +277,7 @@ console.log('AUTH USER:', authData?.user, authErr);
   try {
     setSubmitting(true);
 
-    // 1. Read photo
-    const uri = photoUri.startsWith('file://')
-      ? photoUri
-      : `file://${photoUri}`;
-
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: 'base64',
-    });
-
-    const bytes = Buffer.from(base64, 'base64');
+  
 
     // 2. Create report first
     const { data: report, error: reportError } = await supabase
@@ -243,12 +297,22 @@ console.log('AUTH USER:', authData?.user, authErr);
     // 3. Upload photo using report.id
     const photoPath = `ais-reports/${report.id}.jpg`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('ais-reports')
-      .upload(photoPath, bytes, {
-        contentType: 'image/jpeg',
-        upsert: true,
-      });
+  
+  // Convert file to ArrayBuffer (SAFE for Expo)
+const fileUri = photoUri.startsWith('file://')
+  ? photoUri
+  : `file://${photoUri}`;
+
+const fileData = await fetch(fileUri);
+const arrayBuffer = await fileData.arrayBuffer();
+
+// Upload
+const { error: uploadError } = await supabase.storage
+  .from('ais-reports')
+  .upload(photoPath, arrayBuffer, {
+    contentType: 'image/jpeg',
+    upsert: true,
+  });
 
     if (uploadError) throw uploadError;
 
@@ -288,10 +352,11 @@ function reset() {
 
   
 <MapView
+  key={mapKey}
   ref={mapRef}
   style={StyleSheet.absoluteFill}
-  mapType={mapType}   // 👈 ADD THIS LINE
-  region={isAdjustingLocation ? undefined : initialRegion}
+  mapType={mapType}
+  initialRegion={initialRegion}
   showsUserLocation
   mapPadding={{
     top: 120,
@@ -308,27 +373,25 @@ function reset() {
 
   {/* CONFIRMED REPORT MARKERS */}
 {!isAdjustingLocation &&
-  confirmedReports.map((report) => (
-    <Marker
-      key={report.id}
-      coordinate={{
-        latitude: report.latitude,
-        longitude: report.longitude,
-      }}
-      anchor={{ x: 0.5, y: 1 }}
-      onPress={() => setSelectedReport(report)}
-    >
-      <View style={styles.markerContainer}>
-        <ExpoImage
-          source={{
-            uri: report.species?.image_url || 'https://your-default-icon.png'
-          }}
-          style={styles.markerImage}
-          contentFit="contain"
-          cachePolicy="disk"
-          priority="high"
-        />
-      </View>
+  filteredReports.map((report) => (
+  <Marker
+  key={report.id}
+  coordinate={{
+    latitude: report.latitude,
+    longitude: report.longitude,
+  }}
+  anchor={{ x: 0.5, y: 1 }}
+  onPress={() => setSelectedReport(report)}
+tracksViewChanges={false}
+>
+<View style={styles.markerContainer}>
+  <ExpoImage
+    source={{ uri: report.species?.image_url || undefined }}
+    style={styles.markerImage}
+    contentFit="contain"
+    cachePolicy="disk"
+  />
+</View>
     </Marker>
   ))}
 </MapView>
@@ -376,10 +439,11 @@ function reset() {
             }}
           >
             <ExpoImage
-              source={{ uri: sp.image_url || undefined }}
-              style={{ width: 24, height: 24 }}
-              contentFit="contain"
-            />
+  source={{ uri: sp.image_url || undefined }}
+  style={{ width: 24, height: 24 }}
+  contentFit="contain"
+  cachePolicy="disk"
+/>
             <Text>{sp.common_name}</Text>
           </Pressable>
         ))}
@@ -513,16 +577,12 @@ onPress={(e) => {
 
    {selectedReport.species?.image_url && (
   <Pressable onPress={() => setImageOpen(true)}>
-    <Image
+  
+<ExpoImage
   source={{ uri: selectedReport.species.image_url }}
-  style={{
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#f2f2f2',
-    marginLeft: 50  // 👈 subtle shift left
-  }}
-  resizeMode="contain"
+  style={styles.cardImage}
+  contentFit="contain"
+  cachePolicy="disk"   // 👈 THIS IS THE MAGIC
 />
   </Pressable>
 )}
@@ -952,16 +1012,17 @@ bottomActionRow: {
   alignItems: 'center',
 },
 bottomButtonCompact: {
-  flex: 1,                    // 👈 takes most space
+  flex: 1,
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 8,
+  gap: 10,
   backgroundColor: '#fff',
-  paddingVertical: 14,
-  borderRadius: 999,
+  paddingVertical: 16,
+  paddingHorizontal: 24,
+  borderRadius: 18,   // 👈 instead of 999
   borderWidth: 1,
-  borderColor: '#ddd',
+  borderColor: '#e5e5ea',
   shadowColor: '#000',
   shadowOpacity: 0.08,
   shadowRadius: 6,
@@ -997,5 +1058,11 @@ dropdownContainer: {
   shadowRadius: 10,
   elevation: 10,
 },
+cardImage: {
+  width: 64,
+  height: 64,
+  borderRadius: 12,
+  backgroundColor: '#f2f2f2',
+}
 
 });

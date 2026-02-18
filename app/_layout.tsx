@@ -1,7 +1,44 @@
 import { supabase } from '@/supabaseClient';
-import { Stack } from 'expo-router';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  View
+} from 'react-native';
+
+const IOS_BLUE = '#007AFF';
+const LOGO = require('../assets/LaunchNB.png');
+
+function HeaderTitle() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.header}>
+      
+      {/* CENTER LOGO */}
+      <View style={styles.absoluteCenter}>
+        <Image
+          source={LOGO}
+          style={styles.centerLogo}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* INFO BUTTON */}
+      <Pressable
+        style={styles.infoButton}
+        onPress={() => router.push('/clean-drain-dry')}
+      >
+        <FontAwesome name="info-circle" size={18} color={IOS_BLUE} />
+      </Pressable>
+
+    </View>
+  );
+}
 
 export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
@@ -10,7 +47,6 @@ export default function RootLayout() {
     let mounted = true;
 
     const initAuth = async () => {
-      // 1️⃣ Explicitly check for existing session
       const {
         data: { session },
         error,
@@ -20,7 +56,6 @@ export default function RootLayout() {
         console.error('❌ getSession error:', error);
       }
 
-      // 2️⃣ If no session → sign in anonymously
       if (!session) {
         console.log('👤 no session — signing in anonymously');
 
@@ -39,7 +74,6 @@ export default function RootLayout() {
 
     initAuth();
 
-    // 3️⃣ Listener ONLY for logging / future changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -58,36 +92,74 @@ export default function RootLayout() {
 
   if (!authReady) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#fff',
-        }}
-      >
+      <View style={styles.loader}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
 
-  // 👇 THIS is the only real change
   return (
-    <Stack>
-      {/* Bottom tabs */}
+    <Stack
+      screenOptions={{
+        headerTitle: HeaderTitle, // default header for tabs
+        headerTitleAlign: 'center',
+      }}
+    >
+      {/* Tabs use custom logo header */}
       <Stack.Screen
         name="(tabs)"
-        options={{ headerShown: false }}
+        options={{
+          headerShown: true,
+        }}
       />
 
-      {/* Global CDD screen */}
+      {/* Clean Drain Dry overrides header */}
       <Stack.Screen
         name="clean-drain-dry"
         options={{
-          title: 'Clean • Drain • Dry',
+          headerTitle: 'Clean • Drain • Dry', // 🔥 override here
           headerBackTitle: 'Back',
         }}
       />
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+
+  loader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  header: {
+  width: '100%',
+  height: 44,
+  justifyContent: 'center',
+},
+
+absoluteCenter: {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  alignItems: 'center',
+},
+
+centerLogo: {
+  width: 150,
+  height: 34,
+},
+
+infoButton: {
+  position: 'absolute',
+  right: 16,
+  height: 36,
+  width: 36,
+  borderRadius: 18,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(0,122,255,0.08)',
+},
+
+});

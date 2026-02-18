@@ -1,7 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { UnreadNotificationsContext } from '@/app/context/UnreadNotificationsContext';
 import { registerForPushNotifications } from '@/lib/registerForPushNotifications';
@@ -9,39 +8,6 @@ import { supabase } from '@/supabaseClient';
 
 const IOS_BLUE = '#007AFF';
 const INACTIVE_GRAY = '#8E8E93';
-
-/* ---------- HEADER TITLE ---------- */
-
-import { useRouter } from 'expo-router';
-import { Pressable } from 'react-native';
-
-function HeaderTitle() {
-  const router = useRouter();
-
-  return (
-    <View style={styles.header}>
-      {/* Left */}
-      <View style={styles.left}>
-        <Text style={styles.title}>LaunchNB</Text>
-        <Image
-          source={require('@/assets/nb-pin.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Right - CDD */}
-      <Pressable
-        style={styles.cddPill}
-        onPress={() => router.push('/clean-drain-dry')}
-      >
-        <Text style={styles.cddText}>CDD</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-/* ---------- ROOT LAYOUT ---------- */
 
 export default function TabLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -105,9 +71,7 @@ export default function TabLayout() {
     <UnreadNotificationsContext.Provider value={ctxValue}>
       <Tabs
         screenOptions={{
-          headerShown: true,
-          headerTitle: () => <HeaderTitle />,
-          headerTitleAlign: 'center',
+          headerShown: false, // 🚨 Root layout owns header now
           tabBarActiveTintColor: IOS_BLUE,
           tabBarInactiveTintColor: INACTIVE_GRAY,
         }}
@@ -145,30 +109,25 @@ export default function TabLayout() {
           }}
         />
 
-
         {/* 📸 Report AIS */}
-<Tabs.Screen
-  name="report"
-  options={{
-    title: 'Report',
-    tabBarIcon: ({ color }) => (
-      <FontAwesome name="camera" size={26} color={color} />
-    ),
-  }}
-/>
-
+        <Tabs.Screen
+          name="report"
+          options={{
+            title: 'Report',
+            tabBarIcon: ({ color }) => (
+              <FontAwesome name="camera" size={26} color={color} />
+            ),
+          }}
+        />
 
         {/* 🔔 Alerts */}
-      <Tabs.Screen
-  name="notifications"
-  options={{
-    title: 'Alerts',
-    tabBarIcon: ({ color }) => (
-      <FontAwesome name="bell" size={26} color={color} />
-    ),
-
-
-            // 🔴 THIS is what puts the "3" on the bell icon
+        <Tabs.Screen
+          name="notifications"
+          options={{
+            title: 'Alerts',
+            tabBarIcon: ({ color }) => (
+              <FontAwesome name="bell" size={26} color={color} />
+            ),
             tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
             tabBarBadgeStyle: {
               backgroundColor: '#FF3B30',
@@ -181,53 +140,7 @@ export default function TabLayout() {
             },
           }}
         />
-
       </Tabs>
     </UnreadNotificationsContext.Provider>
   );
 }
-
-/* ---------- STYLES ---------- */
-
-const styles = StyleSheet.create({
-header: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  width: '100%',
-  paddingHorizontal: 12, // 👈 this is the key
-},
-
-
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginRight: -4,
-  },
-
-  logo: {
-    width: 30,
-    height: 30,
-    marginTop: 4,
-  },
-  left: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
-
-cddPill: {
-  backgroundColor: '#F2F2F7', // iOS system gray 6
-  paddingHorizontal: 10,
-  paddingVertical: 4,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: '#D1D1D6', // iOS system gray 4
-},
-
-cddText: {
-  color: IOS_BLUE,
-  fontWeight: '600',
-  fontSize: 13,
-},
-
-});

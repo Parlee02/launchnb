@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Database } from './database.types'; // 👈 THIS IS THE KEY LINE
 
 console.log('🔥 SUPABASE CLIENT FILE LOADED');
 
@@ -6,7 +7,10 @@ const supabaseUrl = 'https://stghveoagifbdhyrhxcl.supabase.co';
 const supabaseAnonKey =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0Z2h2ZW9hZ2lmYmRoeXJoeGNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1NzM0MjUsImV4cCI6MjA4MTE0OTQyNX0.ikhve3ZebLn-suAsE0hamPi3gh_LewvtcE5oK4yjER0';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey
+);
 
 // ---- DEBUG BLOCK ----
 (async () => {

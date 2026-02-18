@@ -87,7 +87,7 @@ const loadLaunches = async () => {
     console.error('loadLaunches error:', error);
   }
 
-  setLaunches(data ?? []);
+setLaunches((data as Launch[]) ?? []);
   setLoadingLaunches(false);
 };
 

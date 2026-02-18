@@ -1,5 +1,11 @@
+import { Tables } from '@/database.types';
 import { supabase } from '@/supabaseClient';
 import { useEffect, useMemo, useRef, useState } from 'react';
+
+type DeconStation = Tables<'decon_stations'>
+type MobileDeconStation = Tables<'mobile_decon_stations'>
+type Province = 'NB' | 'QC'
+
 import {
   ActivityIndicator,
   Image,
@@ -17,33 +23,9 @@ import MapView, { Callout, Circle, Marker } from 'react-native-maps';
 /* ---------------- PRELOADED IMAGES ---------------- */
 
 const DECON_ICON = require('@/assets/decon.png');
-const SAT_ICON = require('@/assets/imagesat.png');
-const DEF_ICON = require('@/assets/imagedef.png');
+const SAT_ICON = require('@/assets/imagesat2.png');
+const DEF_ICON = require('@/assets/imagedef2.png');
 
-/* ---------------- TYPES ---------------- */
-
-type DeconStation = {
-  station_id: string;
-  station_type: string;
-  location_name: string;
-  station_name: string;
-  latitude: number;
-  longitude: number;
-  operational_status: string;
-};
-
-type MobileDeconStation = {
-  id: string;
-  station_name: string;
-  latitude: number;
-  longitude: number;
-  start_time: string;
-  end_time: string;
-  notes: string | null;
-};
-
-
-type Province = 'NB' | 'QC';
 
 /* ---------------- CONSTANTS ---------------- */
 
@@ -116,7 +98,7 @@ export default function DeconMapScreen() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
     return searchableStations.filter(s =>
-      s.station_name.toLowerCase().includes(q)
+  (s.station_name ?? '').toLowerCase().includes(q)
     );
   }, [searchableStations, searchQuery]);
 
@@ -209,7 +191,9 @@ export default function DeconMapScreen() {
                 style={styles.dropdownItem}
                 onPress={() => selectStation(s)}
               >
-                <Text style={styles.dropdownText}>{s.station_name}</Text>
+<Text style={styles.dropdownText}>
+  {s.station_name ?? 'Unnamed station'}
+</Text>
               </Pressable>
             ))}
           </View>

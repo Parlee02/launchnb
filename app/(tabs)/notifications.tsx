@@ -5,8 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   useCallback,
   useContext,
-  useEffect,
-  useState,
+  useState
 } from 'react';
 import {
   ActivityIndicator,
@@ -39,7 +38,7 @@ export default function NotificationsScreen() {
   /* ---------- LOAD NOTIFICATIONS ---------- */
 
   const loadNotifications = useCallback(async () => {
-    setLoading(true);
+ setLoading(prev => prev); // do nothing
 
     const {
       data: { user },
@@ -50,10 +49,26 @@ export default function NotificationsScreen() {
       console.error('❌ auth error:', authError);
     }
 
-    const { data: notifData, error: notifError } = await supabase
-      .from('notifications_with_read')
-      .select('id, title, body, created_at, is_read')
-      .order('created_at', { ascending: false });
+if (!user) {
+  setLoading(false);
+  return;
+}
+
+
+const { data: notifData, error: notifError } = await supabase
+  .from('notifications')
+  .select(`
+    id,
+    title,
+    body,
+    created_at,
+    notification_reads (
+      user_id
+    )
+  `)
+  .order('created_at', { ascending: false });
+
+
 
     if (notifError || !notifData) {
       console.error('❌ failed to load notifications:', notifError);
@@ -62,23 +77,30 @@ export default function NotificationsScreen() {
       return;
     }
 
-    setNotifications(notifData);
+const formatted: NotificationRow[] = (notifData ?? []).map((n: any) => ({
+  id: n.id as string,
+  title: n.title as string,
+  body: n.body as string,
+  created_at: n.created_at as string,
+  is_read:
+    Array.isArray(n.notification_reads) &&
+    n.notification_reads.some((r: any) => r.user_id === user.id),
+}));
+
+
+setNotifications(formatted);
+
     setLoading(false);
   }, []);
 
-  /* ---------- LOAD ON MOUNT ---------- */
-
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
   /* ---------- REFRESH BADGE ON FOCUS ---------- */
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshUnreadCount();
-    }, [refreshUnreadCount])
-  );
+ useFocusEffect(
+  useCallback(() => {
+    loadNotifications();
+    refreshUnreadCount();
+  }, [loadNotifications, refreshUnreadCount])
+);
 
   /* ---------- UNREAD COUNT ---------- */
 

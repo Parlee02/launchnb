@@ -79,7 +79,7 @@ export default function CleanDrainDryScreen() {
 
       {/* Button */}
       <Pressable style={styles.button} onPress={openDFOLink}>
-        <Text style={styles.buttonText}>DFO Guidance</Text>
+        <Text style={styles.buttonText}>Learn More</Text>
       </Pressable>
 
       {/* About */}
@@ -104,6 +104,34 @@ export default function CleanDrainDryScreen() {
         </Text>
         .
       </Text>
+
+{/* Corrections */}
+<Text style={styles.header}>Data Feedback</Text>
+
+<Text style={styles.section}>
+  If a boat launch, tournament, or related data is missing, outdated, or incorrect, please let us know so we can review and update the associated data.
+</Text>
+
+<Pressable
+  style={styles.linkRow}
+  onPress={async () => {
+    const url = 'mailto:info@launchnb.ca?subject=LaunchNB Data Correction';
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      Linking.openURL(url);
+    } else {
+      alert('Email: info@launchnb.ca');
+    }
+  }}
+>
+  <Text style={styles.linkText}>
+    Report an issue
+  </Text>
+</Pressable>
+
+
+
+
 
       {/* Legal */}
       <LegalDisclaimer />
@@ -195,4 +223,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+linkRow: {
+  marginTop: 10,
+},
+
+linkText: {
+  color: IOS_BLUE,
+  fontSize: 15,
+  fontWeight: '600',
+},
+
+
+
 });
