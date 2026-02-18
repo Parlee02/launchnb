@@ -82,53 +82,88 @@ export default function CleanDrainDryScreen() {
         <Text style={styles.buttonText}>Learn More</Text>
       </Pressable>
 
-      {/* About */}
-      <Text style={styles.header}>About LaunchNB</Text>
-      <Text style={styles.section}>
-        LaunchNB is an independent, non-government informational tool designed to
-        support awareness of aquatic invasive species prevention.
-        For questions or feedback, contact us at{' '}
-        <Text
-          style={{ color: IOS_BLUE, fontWeight: '600' }}
-          onPress={async () => {
-            const url = 'mailto:info@launchnb.ca';
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-              Linking.openURL(url);
-            } else {
-              alert('Email: info@launchnb.ca');
-            }
-          }}
-        >
-          info@launchnb.ca
-        </Text>
-        .
-      </Text>
 
-{/* Corrections */}
-<Text style={styles.header}>Data Feedback</Text>
+{/* Decontamination Stations */}
+<Text style={styles.header}>Decontamination Stations</Text>
 
 <Text style={styles.section}>
-  If a boat launch, tournament, or related data is missing, outdated, or incorrect, please let us know so we can review and update the associated data.
+  Decontamination stations are designated locations where watercraft and
+  equipment can be professionally cleaned to reduce the risk of spreading
+  aquatic invasive species between waterbodies.
 </Text>
 
-<Pressable
-  style={styles.linkRow}
-  onPress={async () => {
-    const url = 'mailto:info@launchnb.ca?subject=LaunchNB Data Correction';
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      Linking.openURL(url);
-    } else {
-      alert('Email: info@launchnb.ca');
-    }
-  }}
->
-  <Text style={styles.linkText}>
-    Report an issue
-  </Text>
-</Pressable>
+<Text style={styles.section}>
+  These stations may be operated by provincial agencies, municipalities,
+  watershed groups, conservation organizations, or other authorized partners.
+  Availability and operating periods can vary by region and season.
+</Text>
 
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>Purpose</Text>
+  <Text style={styles.cardText}>
+    Decontamination stations use high-pressure and/or hot water systems to
+    remove attached plants, animals, mud, and microscopic organisms that may
+    not be visible to the eye. 
+  </Text>
+</View>
+
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>When to Use One</Text>
+  <Text style={styles.cardText}>
+    Boaters are encouraged to use a decontamination station when moving between
+    waterbodies, especially if aquatic invasive species are known or suspected
+    in the area. 
+  </Text>
+</View>
+
+
+
+{/* About */}
+<Text style={styles.header}>About LaunchNB</Text>
+
+<Text style={styles.section}>
+  LaunchNB is an independent, non-government informational tool designed to
+  support awareness of aquatic invasive species prevention.
+
+  {'\n\n'}
+
+  If a boat launch, tournament, or related data is missing, outdated, or
+  incorrect, please{' '}
+  <Text
+    style={{ color: IOS_BLUE, fontWeight: '600' }}
+    onPress={async () => {
+      const url =
+        'mailto:info@launchnb.ca?subject=LaunchNB Data Correction';
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        alert('Email: info@launchnb.ca');
+      }
+    }}
+  >
+    report an issue
+  </Text>{' '}
+  so we can review and update the associated information.
+
+  {'\n\n'}
+
+  For general questions or feedback, contact us at{' '}
+  <Text
+    style={{ color: IOS_BLUE, fontWeight: '600' }}
+    onPress={async () => {
+      const url = 'mailto:info@launchnb.ca';
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        alert('Email: info@launchnb.ca');
+      }
+    }}
+  >
+    info@launchnb.ca
+  </Text>.
+</Text>
 
 
 
