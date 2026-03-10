@@ -169,6 +169,13 @@ const currentEvent = eventGroup[eventIndex];
   const mapRef = useRef<MapView>(null);
   const lastLaunchRef = useRef<Launch | null>(null);
 
+  const [region, setRegion] = useState({
+  latitude: 46.6,
+  longitude: -65.3,
+  latitudeDelta: 6.4,
+  longitudeDelta: 6.4,
+});
+
 /* Previous trip */
 const [prevProvince, setPrevProvince] = useState('New Brunswick');
 const [prevQuery, setPrevQuery] = useState('');
@@ -615,16 +622,12 @@ useEffect(() => {
   ref={mapRef}
   style={styles.map}
   mapType={mapType}
-  initialRegion={{
-    latitude: 46,
-    longitude: -66.8,
-    latitudeDelta: 3,
-    longitudeDelta: 3,
+  region={region}
+  onRegionChangeComplete={setRegion}
+  onPress={() => {
+    setShowLaunchDropdown(false);
+    Keyboard.dismiss();
   }}
-onPress={() => {
-  setShowLaunchDropdown(false);
-  Keyboard.dismiss();
-}}
 >
   {/* LAUNCHES */}
   {layer === 'launches' &&
@@ -837,25 +840,64 @@ onPress={() => {
   ]}
 >
 
-              {view === 'prompt' && (
-                <>
-                  <Text style={styles.modalTitle}>{selectedLaunch?.Name}</Text>
+          {view === 'prompt' && (
+  <>
+    <Text style={styles.modalTitle}>{selectedLaunch?.Name}</Text>
 
-                 <Pressable
+    {/* CHECK IN */}
+    <Pressable
+      style={styles.eventButton}
+      onPress={() => setView('checkin')}
+    >
+      <Text style={styles.primaryText}>Check in at this launch</Text>
+    </Pressable>
+
+    {/* GET DIRECTIONS */}
+<Pressable
   style={styles.eventButton}
-  onPress={() => setView('checkin')}
+  onPress={async () => {
+    const lat = selectedLaunch?.Latitude;
+    const lon = selectedLaunch?.Longitude;
+
+    if (!lat || !lon) return;
+
+    const url = Platform.select({
+      ios: `maps://?daddr=${lat},${lon}`,
+      android: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`,
+    });
+
+    if (!url) return;
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        // fallback if maps:// fails
+        const fallback = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+        await Linking.openURL(fallback);
+      }
+    } catch (err) {
+      console.error("Directions error:", err);
+    }
+  }}
 >
-  <Text style={styles.primaryText}>Check in at this launch</Text>
+  <Text style={styles.primaryText}>Get directions</Text>
 </Pressable>
 
-            <Pressable
+{/* CLOSE */}
+<Pressable
   style={styles.eventButtonSecondary}
   onPress={closeAll}
 >
   <Text style={styles.secondaryText}>Close</Text>
 </Pressable>
-                </>
-              )}
+  </>
+)}
+
+
+
 
               {view === 'checkin' && (
                 <>

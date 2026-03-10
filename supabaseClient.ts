@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from './database.types'; // 👈 THIS IS THE KEY LINE
+import { Database } from './types/supabase';
 
 console.log('🔥 SUPABASE CLIENT FILE LOADED');
 

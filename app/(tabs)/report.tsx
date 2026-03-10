@@ -84,17 +84,19 @@ const [mapType, setMapType] =
 
 const [mapKey, setMapKey] = useState(0);
 
+type RecordLayer = 'community' | 'scientific';
+
+const [recordLayer, setRecordLayer] = useState<RecordLayer>('community');
 
   const SAT_ICON = require('@/assets/imagesat2.png');
 const DEF_ICON = require('@/assets/imagedef2.png');
 
-const initialRegion: Region = {
-  latitude: 46.5653,
-  longitude: -66.4619,
-  latitudeDelta: 3.5,
-  longitudeDelta: 3.5,
+const ATLANTIC_REGION: Region = {
+  latitude: 46.6,
+  longitude: -65.3,
+  latitudeDelta: 6.4,
+  longitudeDelta: 6.4,
 };
-
 
 /* ---------------- LOAD SPECIES ---------------- */
 
@@ -126,6 +128,17 @@ useEffect(() => {
 useEffect(() => {
   setMapKey(k => k + 1);
 }, [selectedSpecies]);
+
+useEffect(() => {
+  setSelectedReport(null);
+}, [recordLayer]);
+
+useEffect(() => {
+  if (mapRef.current) {
+    mapRef.current.animateToRegion(ATLANTIC_REGION, 0);
+  }
+}, [mapKey]);
+
 
 useEffect(() => {
   speciesList.forEach(sp => {
@@ -356,8 +369,11 @@ function reset() {
   ref={mapRef}
   style={StyleSheet.absoluteFill}
   mapType={mapType}
-  initialRegion={initialRegion}
-  showsUserLocation
+  initialRegion={ATLANTIC_REGION}
+onMapReady={() => {
+  mapRef.current?.animateToRegion(ATLANTIC_REGION, 0);
+}}
+showsUserLocation
   mapPadding={{
     top: 120,
     right: 0,
@@ -369,31 +385,43 @@ function reset() {
   }
 >
   {/* TEMP REPORT MARKER */}
-  {reportLocation && <Marker coordinate={reportLocation} />}
-
-  {/* CONFIRMED REPORT MARKERS */}
-{!isAdjustingLocation &&
-  filteredReports.map((report) => (
+{reportLocation && (
   <Marker
-  key={report.id}
-  coordinate={{
-    latitude: report.latitude,
-    longitude: report.longitude,
-  }}
-  anchor={{ x: 0.5, y: 1 }}
-  onPress={() => setSelectedReport(report)}
-tracksViewChanges={false}
->
-<View style={styles.markerContainer}>
-  <ExpoImage
-    source={{ uri: report.species?.image_url || undefined }}
-    style={styles.markerImage}
-    contentFit="contain"
-    cachePolicy="disk"
-  />
-</View>
+    coordinate={reportLocation}
+    anchor={{ x: 0.5, y: 1 }}
+    tracksViewChanges={false}
+  >
+    <View style={styles.markerContainer}>
+      <FontAwesome name="map-marker" size={16} color={IOS_BLUE} />
+    </View>
+  </Marker>
+)}
+
+{/* COMMUNITY REPORT MARKERS */}
+{!isAdjustingLocation && recordLayer === 'community' &&
+  filteredReports.map((report) => (
+    <Marker
+      key={report.id}
+      coordinate={{
+        latitude: report.latitude,
+        longitude: report.longitude,
+      }}
+      anchor={{ x: 0.5, y: 1 }}
+      onPress={() => setSelectedReport(report)}
+      tracksViewChanges={false}
+    >
+      <View style={styles.markerContainer}>
+        <ExpoImage
+          source={{ uri: report.species?.image_url || undefined }}
+          style={styles.markerImage}
+          contentFit="contain"
+          cachePolicy="disk"
+        />
+      </View>
     </Marker>
   ))}
+
+  
 </MapView>
 
 
@@ -482,9 +510,10 @@ onPress={(e) => {
       </View>
     </Pressable>
 
+
+
   </View>
 )}
-
 
       {/* MAP HINT */}
    {reportLocation && (

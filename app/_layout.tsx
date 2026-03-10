@@ -1,9 +1,11 @@
 import { supabase } from '@/supabaseClient';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Image,
   Pressable,
   StyleSheet,
@@ -13,19 +15,87 @@ import {
 const IOS_BLUE = '#007AFF';
 const LOGO = require('../assets/LaunchNB.png');
 
+
+
+
+
+
 function HeaderTitle() {
   const router = useRouter();
 
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const float = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: 3200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 3200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+       duration: 2400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+      duration: 2400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    float.start();
+    pulse.start();
+
+    return () => {
+      float.stop();
+      pulse.stop();
+    };
+  }, [floatAnim, pulseAnim]);
+
+  const translateY = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -1.5],
+  });
+
+  const scale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.03],
+  });
+
+  const opacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.7, 1],
+  });
+
   return (
     <View style={styles.header}>
-      
       {/* CENTER LOGO */}
       <View style={styles.absoluteCenter}>
-        <Image
-          source={LOGO}
-          style={styles.centerLogo}
-          resizeMode="contain"
-        />
+        <Animated.View style={{ transform: [{ translateY }] }}>
+          <Image
+            source={LOGO}
+            style={styles.centerLogo}
+            resizeMode="contain"
+          />
+        </Animated.View>
       </View>
 
       {/* INFO BUTTON */}
@@ -33,12 +103,31 @@ function HeaderTitle() {
         style={styles.infoButton}
         onPress={() => router.push('/clean-drain-dry')}
       >
-        <FontAwesome name="info-circle" size={18} color={IOS_BLUE} />
+        <Animated.View
+          style={[
+            styles.glowWrapper,
+            {
+              transform: [{ scale }],
+              opacity,
+            },
+          ]}
+        >
+          <FontAwesome name="info-circle" size={18} color={IOS_BLUE} />
+        </Animated.View>
       </Pressable>
-
     </View>
   );
 }
+
+
+
+
+
+
+
+
+
+
 
 export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
@@ -117,7 +206,7 @@ export default function RootLayout() {
       <Stack.Screen
         name="clean-drain-dry"
         options={{
-          headerTitle: 'Clean • Drain • Dry', // 🔥 override here
+          headerTitle: '', // 🔥 override here
           headerBackTitle: 'Back',
         }}
       />
@@ -160,6 +249,21 @@ infoButton: {
   alignItems: 'center',
   justifyContent: 'center',
   backgroundColor: 'rgba(0,122,255,0.08)',
+},
+glowWrapper: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: 36,
+  width: 36,
+  borderRadius: 18,
+  backgroundColor: 'rgba(0,122,255,0.10)',
+
+  shadowColor: IOS_BLUE,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.15,
+  shadowRadius: 6,
+
+  elevation: 3,
 },
 
 });

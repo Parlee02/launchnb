@@ -73,6 +73,12 @@ export default function FlowMapScreen() {
   const ignoreNextMapPressRef = useRef(false);
   const mapRef = useRef<MapView>(null);
   const activeLaunchRef = useRef<string | null>(null);
+  const [region, setRegion] = useState({
+  latitude: 46.6,
+  longitude: -65.3,
+  latitudeDelta: 6.4,
+  longitudeDelta: 6.4,
+});
 
   /* ---------------- DATA LOADING ---------------- */
 
@@ -292,28 +298,28 @@ longitude: launch.longitude,
           )}
       </View>
 
-      {/* 🗺️ MAP */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        mapType={mapType}
-        initialRegion={{
-          latitude: 46,
-          longitude: -66.8,
-          latitudeDelta: 4,
-          longitudeDelta: 4,
-        }}
-        onPress={() => {
-          if (ignoreNextMapPressRef.current) {
-            ignoreNextMapPressRef.current = false;
-            return;
-          }
+  {/* 🗺️ MAP */}
+<MapView
+  ref={mapRef}
+  style={styles.map}
+  mapType={mapType}
+  initialRegion={{
+    latitude: 46.6,
+    longitude: -65.3,
+    latitudeDelta: 6.4,
+    longitudeDelta: 6.4,
+  }}
+  onPress={() => {
+    if (ignoreNextMapPressRef.current) {
+      ignoreNextMapPressRef.current = false;
+      return;
+    }
 
-          setSelectedLaunch(null);
-          setSelectedFlow(null);
-          setRows([]);
-        }}
-      >
+    setSelectedLaunch(null);
+    setSelectedFlow(null);
+    setRows([]);
+  }}
+>
         {!selectedLaunch &&
         launches.map(l => (
   <Marker
@@ -634,33 +640,41 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
-  toggleOverlay: {
-    position: 'absolute',
-    top: 76,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 4,
-    gap: 6,
-    elevation: 6,
-    zIndex: 20,
-  },
+ toggleOverlay: {
+  position: 'absolute',
+  top: 76,
+  left: 12,
+  right: 12,
+  flexDirection: 'row',
+  backgroundColor: '#fff',
+  borderRadius: 20,
+  padding: 4,
+  gap: 6,
+  elevation: 6,
+  borderWidth: 1,
+  borderColor: '#E7E7EA',
+  zIndex: 20,
+},
 
-  toggleButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: '#eee',
-  },
+toggleButton: {
+  flex: 1,
+  paddingVertical: 6,
+  paddingHorizontal: 14,
+  borderRadius: 16,
+  backgroundColor: '#F2F2F7', // same as Launch tab
+  alignItems: 'center',
+},
 
-  toggleActive: {
-    backgroundColor: '#007aff',
-  },
+toggleActive: {
+  backgroundColor: '#007AFF', // EXACT same blue as Launch tab
+},
 
-  toggleText: {
-    fontWeight: '600',
-  },
+toggleText: {
+  fontWeight: '600',
+  fontSize: 14,
+  color: '#333', // 👈 THIS is what fixes the “black” look
+},
+
 
   infoOverlay: {
     position: 'absolute',

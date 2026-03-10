@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "launchnb",
+    "name": "LaunchNB",
     "slug": "launchnb",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,42 +8,51 @@
     "scheme": "launchnb",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "extra": {
       "eas": {
         "projectId": "8fa52c02-735b-41d5-91c1-c86927462981"
       }
     },
+
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.parlee.launchnb",
       "buildNumber": "7",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "LaunchNB uses your location to show nearby boat launches and aquatic invasive species reports."
       }
     },
+
     "android": {
+      "package": "com.parlee.launchnb",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.parlee.launchnb"
+      "predictiveBackGestureEnabled": false
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ],
+
     "experiments": {
       "typedRoutes": true
     }

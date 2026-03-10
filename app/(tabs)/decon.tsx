@@ -156,7 +156,7 @@ export default function DeconMapScreen() {
       <View style={styles.searchWrap}>
         <View style={styles.searchRow}>
           <TextInput
-            placeholder="Search decon stations…"
+            placeholder="Search decontamination stations…"
             value={searchQuery}
             onChangeText={t => {
               setSearchQuery(t);
@@ -230,21 +230,22 @@ export default function DeconMapScreen() {
       </View>
 
       {/* 🗺️ MAP */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        mapType={mapType}
-        initialRegion={{
-          latitude: 46,
-          longitude: -66.8,
-          latitudeDelta: 3,
-          longitudeDelta: 3,
-        }}
-        onPress={() => {
-          setShowDropdown(false);
-          Keyboard.dismiss();
-        }}
-      >
+      {/* 🗺️ MAP */}
+<MapView
+  ref={mapRef}
+  style={styles.map}
+  mapType={mapType}
+  initialRegion={{
+    latitude: 46.6,
+    longitude: -65.3,
+    latitudeDelta: 6.4,
+    longitudeDelta: 6.4,
+  }}
+  onPress={() => {
+    setShowDropdown(false);
+    Keyboard.dismiss();
+  }}
+>
         {/* PERMANENT STATIONS (CONDITIONALLY RENDERED) */}
        {stations.map(station => {
   const isQC = station.station_id.startsWith('STA');
@@ -415,12 +416,12 @@ export default function DeconMapScreen() {
       <View style={styles.legend} pointerEvents="none">
         <View style={styles.legendRow}>
           <View style={[styles.legendDot, styles.legendDotBlue]} />
-          <Text style={styles.legendText}>Permanent decon station</Text>
+          <Text style={styles.legendText}>Permanent decontamination station</Text>
         </View>
 
         <View style={styles.legendRow}>
           <View style={[styles.legendDot, styles.legendDotGreen]} />
-          <Text style={styles.legendText}>Mobile decon station</Text>
+          <Text style={styles.legendText}>Mobile decontamination station</Text>
         </View>
       </View>
 
@@ -507,35 +508,44 @@ const styles = StyleSheet.create({
   dropdownText: { fontSize: 14, fontWeight: '600' },
 
   provinceToggle: {
-    position: 'absolute',
-    top: 76,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 6,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: '#E7E7EA',
-    zIndex: 40,
-  },
-  provinceBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-    borderRadius: 20,
-    backgroundColor: '#F2F2F7',
-    minHeight: 44,
-    minWidth: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  provinceBtnActive: { backgroundColor: '#007aff' },
-  provinceText: {
-    fontWeight: '700',
-    fontSize: 16,
-    color: '#333',
-  },
-  provinceTextActive: { color: '#fff' },
+  position: 'absolute',
+  top: 76,
+  left: 12,
+  right: 12,
+  flexDirection: 'row',
+  backgroundColor: '#fff',
+  borderRadius: 20,
+  padding: 4,
+  gap: 6,
+  elevation: 6,
+  borderWidth: 1,
+  borderColor: '#E7E7EA',
+  zIndex: 40,
+},
+
+provinceBtn: {
+  flex: 1,
+  paddingVertical: 6,
+  paddingHorizontal: 14,
+  borderRadius: 16,
+  backgroundColor: '#F2F2F7',
+  alignItems: 'center',
+},
+
+provinceBtnActive: {
+  backgroundColor: '#007AFF',
+},
+
+provinceText: {
+  fontWeight: '600',
+  fontSize: 14,
+  color: '#333',
+},
+
+provinceTextActive: {
+  color: '#FFFFFF',
+},
+
 
   pin: {
     width: 44,

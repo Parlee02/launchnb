@@ -1,5 +1,5 @@
 import { supabase } from '@/supabaseClient';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -26,6 +26,7 @@ export default function MapScreen() {
 
   // 🗺️ map type toggle
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     fetchLaunches();
@@ -112,12 +113,12 @@ export default function MapScreen() {
       <MapView
         style={styles.map}
         mapType={mapType}
-        initialRegion={{
-          latitude: 46,
-          longitude: -66.8,
-          latitudeDelta: 3,
-          longitudeDelta: 3,
-        }}
+       initialRegion={{
+  latitude: 45.4,
+  longitude: -63.5,
+  latitudeDelta: 5,
+  longitudeDelta: 5,
+}}
       >
         {filteredLaunches.map(launch => (
           <Marker
